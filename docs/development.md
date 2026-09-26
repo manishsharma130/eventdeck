@@ -5,7 +5,7 @@
 ## Requirements
 
 - Node.js 20 or newer
-- pnpm 11 or newer
+- pnpm 10.x
 
 ## Install dependencies
 

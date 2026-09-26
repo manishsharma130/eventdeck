@@ -26,7 +26,7 @@ The browser connects to `ws://127.0.0.1:4732`, sends `Hello EventDeck`, and rece
 ### Requirements
 
 - Node.js 20 or newer
-- pnpm 11 or newer
+- pnpm 10.x
 
 Check your installed versions:
 
