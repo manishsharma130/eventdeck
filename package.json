@@ -1,12 +1,13 @@
 {
-  "name": "eventdeck",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "eventdeck-workspace",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+    "dev:web": "pnpm --filter ./apps/web dev",
+    "dev:server": "pnpm --filter ./apps/server dev",
+    "build:web": "pnpm --filter ./apps/web build",
+    "build:server": "pnpm --filter ./apps/server build",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  }
 }

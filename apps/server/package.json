@@ -1,0 +1,32 @@
+{
+  "name": "eventdeck",
+  "version": "1.0.0",
+  "description": "Local WebSocket server for EventDeck",
+  "type": "module",
+  "bin": { "eventdeck": "./bin/eventdeck.js" },
+  "files": ["dist", "bin"],
+  "scripts": {
+    "dev": "tsx watch src/cli.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node ./bin/eventdeck.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": ["eventdeck", "websocket", "local-server"],
+  "author": "Manish Sharma",
+  "license": "MIT",
+  "homepage": "https://github.com/manishsharma130/eventdeck#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/manishsharma130/eventdeck.git",
+    "directory": "apps/server"
+  },
+  "bugs": { "url": "https://github.com/manishsharma130/eventdeck/issues" },
+  "engines": { "node": ">=20" },
+  "dependencies": { "ws": "^8.18.3" },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
