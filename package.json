@@ -1,7 +1,7 @@
 {
   "name": "eventdeck-workspace",
   "private": true,
-  "packageManager": "pnpm@11.19.0",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev:web": "pnpm --filter ./apps/web dev",
     "dev:server": "pnpm --filter ./apps/server dev",
