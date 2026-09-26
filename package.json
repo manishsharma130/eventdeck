@@ -1,57 +1,13 @@
 {
-  "name": "eventdeck",
-  "version": "0.1.0",
-  "description": "A local event debugging and validation workspace for mobile developers.",
-  "type": "module",
-  "bin": {
-    "eventdeck": "dist/server/cli.js"
-  },
-  "files": [
-    "dist",
-    "web-dist",
-    "README.md"
-  ],
+  "name": "eventdeck-workspace",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
   "scripts": {
-    "dev": "tsx watch server/cli.ts --no-open",
-    "dev:web": "vite",
-    "build": "npm run build:web && npm run build:server",
-    "build:web": "vite build",
-    "build:server": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.server.json",
-    "start": "node dist/server/cli.js --no-open",
-    "test": "vitest run --config vitest.config.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit"
-  },
-  "keywords": [
-    "adb",
-    "logcat",
-    "events",
-    "android",
-    "debugging"
-  ],
-  "license": "MIT",
-  "engines": {
-    "node": ">=20"
-  },
-  "dependencies": {
-    "@fastify/static": "^10.1.4",
-    "@tanstack/react-virtual": "^3.13.12",
-    "fastify": "^5.6.1",
-    "lucide-react": "^0.544.0",
-    "open": "^10.2.0",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "ws": "^8.18.3",
-    "zustand": "^5.0.8"
-  },
-  "devDependencies": {
-    "@types/node": "^24.5.2",
-    "@types/react": "^19.1.16",
-    "@types/react-dom": "^19.1.9",
-    "@types/ws": "^8.18.1",
-    "@vitejs/plugin-react": "^5.0.3",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2",
-    "vite": "^7.1.7",
-    "vitest": "^3.2.4"
+    "dev:web": "pnpm --filter ./apps/web dev",
+    "dev:server": "pnpm --filter ./apps/server dev",
+    "build:web": "pnpm --filter ./apps/web build",
+    "build:server": "pnpm --filter ./apps/server build",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
   }
 }

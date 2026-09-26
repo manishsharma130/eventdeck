@@ -1,5 +1,7 @@
 node_modules/
+.pnpm-store/
 dist/
-web-dist/
 *.log
+*.tsbuildinfo
 .DS_Store
+*.tgz
