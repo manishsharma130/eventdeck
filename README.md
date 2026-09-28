@@ -5,7 +5,7 @@ EventDeck is a local event-development tool built as a pnpm monorepo. Its curren
 - a **React web application** that shows whether EventDeck is available; and
 - a **local Node.js server**, published as the `eventdeck` npm package, with Fastify HTTP, WebSocket, and SQLite foundations.
 
-The browser connects to `ws://127.0.0.1:4732/ws` and receives a versioned `connection.ready` event. The server also exposes health/status endpoints and initializes a configurable local SQLite database. No EventDeck domain tables or feature behavior are included yet.
+The browser connects to `ws://127.0.0.1:4732/ws` and receives versioned realtime events. The server provides device-aware ADB Live Stream ingestion and recording, reusable Event Rules, ordered Build Flows, and server-owned Flow Execution backed by SQLite.
 
 ## Index
 
@@ -17,6 +17,7 @@ The browser connects to `ws://127.0.0.1:4732/ws` and receives a versioned `conne
   - [HTTP and WebSocket verification](docs/server-foundation-setup.md#verify-the-http-api)
   - [SQLite and migrations](docs/server-foundation-setup.md#sqlite-initialization)
   - [Testing and troubleshooting](docs/server-foundation-setup.md#run-automated-checks)
+- [Data management and execution API](docs/data-management-and-execution.md)
 - [Architecture](docs/architecture.md)
   - [Architecture overview](docs/architecture.md#architecture-overview)
   - [Application layers](docs/architecture.md#application-layers)
@@ -122,6 +123,7 @@ Build output is written to `apps/web/dist` and `apps/server/dist`.
 ## Documentation
 
 - **[Server foundation setup](docs/server-foundation-setup.md)** is the detailed setup and operations guide, including prerequisites, configuration, startup, API/WebSocket verification, SQLite migrations, testing, extension patterns, and troubleshooting.
+- **[Data management and execution](docs/data-management-and-execution.md)** documents Live Stream, recordings, Event Rules, Build Flow, Flow Execution, REST endpoints, WebSocket events, and persistence behavior.
 - **[Architecture](docs/architecture.md)** explains the monorepo, application boundaries, WebSocket lifecycle, build paths, and the reasons behind the design.
 - **[File reference](docs/file-reference.md)** describes the repository structure and responsibility of every project-owned file.
 - **[Development guide](docs/development.md)** covers configuration, type-checking, builds, local npm-package testing, and publishing.

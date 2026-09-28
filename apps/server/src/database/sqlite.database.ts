@@ -18,6 +18,8 @@ export class SqliteDatabase implements Database {
   }
 
   transaction<T>(operation: () => T): T { return this.connection.transaction(operation)() }
+  /** Allows infrastructure adapters to execute SQLite work without leaking the handle into application services. */
+  access<T>(operation: (connection: BetterSqlite3.Database) => T): T { return operation(this.connection) }
   isHealthy(): boolean {
     return (this.connection.prepare('SELECT 1 AS value').get() as { value: number }).value === 1
   }

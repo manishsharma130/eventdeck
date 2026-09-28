@@ -1,3 +1,3 @@
 # Feature modules
 
-Future EventDeck features belong in isolated modules with `domain`, `application`, `infrastructure`, and `api` boundaries. No domain modules or feature tables are part of the server-foundation phase.
+EventDeck features are isolated into `live-stream`, `event-rules`, `build-flow`, and `flow-execution`. Each module keeps transport, application services, domain behavior, and SQLite/ADB infrastructure separate where applicable.
