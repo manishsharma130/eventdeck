@@ -8,6 +8,8 @@
     "build:web": "pnpm --filter ./apps/web build",
     "build:server": "pnpm --filter ./apps/server build",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test:server": "pnpm --filter ./apps/server test",
+    "test": "pnpm -r --if-present test"
   }
 }

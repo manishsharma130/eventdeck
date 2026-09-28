@@ -3,15 +3,20 @@
 EventDeck is a local event-development tool built as a pnpm monorepo. Its current foundation contains:
 
 - a **React web application** that shows whether EventDeck is available; and
-- a **local Node.js server**, published as the `eventdeck` npm package, that accepts WebSocket connections.
+- a **local Node.js server**, published as the `eventdeck` npm package, with Fastify HTTP, WebSocket, and SQLite foundations.
 
-The browser connects to `ws://127.0.0.1:4732`, sends `Hello EventDeck`, and receives the same message from the echo server. This small end-to-end flow establishes the architecture before product features are added.
+The browser connects to `ws://127.0.0.1:4732/ws` and receives a versioned `connection.ready` event. The server also exposes health/status endpoints and initializes a configurable local SQLite database. No EventDeck domain tables or feature behavior are included yet.
 
 ## Index
 
 - [Quick start](#quick-start)
 - [What should I see?](#what-should-i-see)
 - [Common commands](#common-commands)
+- [Detailed server foundation setup](docs/server-foundation-setup.md)
+  - [Configuration](docs/server-foundation-setup.md#environment-variables)
+  - [HTTP and WebSocket verification](docs/server-foundation-setup.md#verify-the-http-api)
+  - [SQLite and migrations](docs/server-foundation-setup.md#sqlite-initialization)
+  - [Testing and troubleshooting](docs/server-foundation-setup.md#run-automated-checks)
 - [Architecture](docs/architecture.md)
   - [Architecture overview](docs/architecture.md#architecture-overview)
   - [Application layers](docs/architecture.md#application-layers)
@@ -51,7 +56,7 @@ In the first terminal:
 pnpm dev:server
 ```
 
-The server listens only on `ws://127.0.0.1:4732`.
+The server listens on `http://127.0.0.1:4732`, with WebSocket connections at `/ws`.
 
 ### 3. Start the web application
 
@@ -81,11 +86,11 @@ Not connected with EventDeck
 
 The client retries every two seconds, so restarting the server restores the connection without refreshing the page.
 
-To verify the echo test, open the browser developer console and look for:
+To verify the WebSocket handshake, open the browser developer console and look for:
 
 ```text
 WebSocket connected
-Echo response: Hello EventDeck
+EventDeck event: {"type":"connection.ready",...}
 ```
 
 ## Common commands
@@ -101,6 +106,9 @@ pnpm dev:web
 # Type-check both applications
 pnpm typecheck
 
+# Run server tests
+pnpm test:server
+
 # Build both applications
 pnpm build
 
@@ -113,6 +121,7 @@ Build output is written to `apps/web/dist` and `apps/server/dist`.
 
 ## Documentation
 
+- **[Server foundation setup](docs/server-foundation-setup.md)** is the detailed setup and operations guide, including prerequisites, configuration, startup, API/WebSocket verification, SQLite migrations, testing, extension patterns, and troubleshooting.
 - **[Architecture](docs/architecture.md)** explains the monorepo, application boundaries, WebSocket lifecycle, build paths, and the reasons behind the design.
 - **[File reference](docs/file-reference.md)** describes the repository structure and responsibility of every project-owned file.
 - **[Development guide](docs/development.md)** covers configuration, type-checking, builds, local npm-package testing, and publishing.
