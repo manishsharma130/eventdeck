@@ -39,6 +39,7 @@ eventdeck/
 ├── docs/
 │   ├── architecture.md
 │   ├── deployment.md
+│   ├── data-management-and-execution.md
 │   ├── development.md
 │   ├── file-reference.md
 │   └── server-foundation-setup.md
@@ -64,6 +65,7 @@ eventdeck/
 - **`docs/file-reference.md`** — documents the repository structure and every project-owned file.
 - **`docs/development.md`** — describes environment configuration, validation, builds, local package testing, and npm publishing.
 - **`docs/deployment.md`** — explains the GitHub Pages workflow, production path configuration, and browser security considerations.
+- **`docs/data-management-and-execution.md`** — documents the four feature modules, HTTP APIs, realtime messages, persistence, and execution lifecycle.
 - **`docs/server-foundation-setup.md`** — provides the detailed server installation, configuration, verification, testing, migration, extension, and troubleshooting guide.
 
 ## Web application files
@@ -93,7 +95,7 @@ eventdeck/
 - **`apps/server/src/websocket/`** — owns client connections, the standard event envelope, direct sends, and broadcasts.
 - **`apps/server/src/server/`** — separates dependency-driven Fastify construction from production startup and shutdown.
 - **`apps/server/src/logging/`** and **`src/shared/`** — provide structured logging and common infrastructure errors.
-- **`apps/server/src/modules/`** — reserves the clean feature-module boundary; it intentionally has no domain implementation yet.
+- **`apps/server/src/modules/`** — contains the isolated Live Stream, Event Rules, Build Flow, and Flow Execution domain/application/infrastructure/API layers.
 - **`apps/server/tests/`** — covers server injection, health/status, temporary SQLite initialization, WebSocket readiness, and broadcasts.
 - **`apps/server/dist/`** — generated JavaScript, declarations, and source maps used by the published CLI. It is created by the build and is not committed.
 

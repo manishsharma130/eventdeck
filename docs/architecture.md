@@ -102,7 +102,7 @@ flowchart TD
 - **CLI lifecycle:** starts the service, prints status, catches errors, and handles `Ctrl+C` or termination signals.
 - **Server lifecycle:** composes dependencies, starts Fastify, and cleanly closes WebSocket clients and SQLite.
 - **Transport:** exposes `/health`, `/api/status`, and `/ws`; WebSocket messages use a versioned envelope.
-- **Persistence:** configures SQLite pragmas and runs migrations without creating feature tables.
+- **Persistence:** configures SQLite pragmas, runs migrations, and stores recordings, event definitions, flows, and selected-flow configuration.
 
 The stable JavaScript file under `bin` loads compiled output from `dist`, so npm users run production JavaScript rather than TypeScript source.
 

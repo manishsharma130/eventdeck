@@ -23,7 +23,7 @@ The implemented public interfaces are:
 - `GET /ws` with a WebSocket upgrade for realtime events; and
 - the `eventdeck` CLI for starting and stopping the local process.
 
-This foundation intentionally does **not** include Live Stream, Recorded Sessions, Event Rules, Build Flow, Flow Execution, ADB integration, or tables for those features. The only SQLite table created is the internal `_eventdeck_migrations` metadata table.
+The foundation now hosts four isolated product modules: Live Stream and recordings, Event Rules, Build Flow, and Flow Execution. Their behavior and API contracts are documented in [Data management and execution](data-management-and-execution.md).
 
 ## Prerequisites
 
@@ -210,7 +210,7 @@ Automated tests never use `~/.eventdeck/eventdeck.db`. Database tests create a u
 
 ## Migration system
 
-The migration runner creates `_eventdeck_migrations` to record each applied version, name, and timestamp. Migrations are sorted by numeric version and each pending migration is applied transactionally.
+The migration runner creates `_eventdeck_migrations` to record each applied version, name, and timestamp. Migrations are sorted by numeric version and each pending migration is applied transactionally. Migration `0001-domain` creates the recording, event-rule, flow, and selected-flow tables.
 
 Future feature work should add a migration under `apps/server/src/database/migrations` and register it in `migrations/index.ts`. A migration has this shape:
 
@@ -316,7 +316,7 @@ The foundation test suite covers:
 - server creation without binding a network port;
 - `/health` and `/api/status` through `app.inject()`;
 - isolated SQLite creation and required pragmas;
-- the absence of domain tables;
+- migration metadata and the expected domain tables;
 - WebSocket connection and `connection.ready`;
 - typed gateway broadcast behavior; and
 - production-style startup and graceful shutdown.
