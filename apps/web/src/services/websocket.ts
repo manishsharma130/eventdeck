@@ -8,13 +8,17 @@ export class EventDeckWebSocket {
   private socket: WebSocket | undefined
   private reconnectTimer: number | undefined
   private stopped = false
+  private hasAttemptedConnection = false
 
   constructor(private readonly onStatusChange: (status: ConnectionStatus) => void) {}
 
   connect(): void {
     this.stopped = false
     this.clearReconnectTimer()
-    this.onStatusChange('connecting')
+    if (!this.hasAttemptedConnection) {
+      this.onStatusChange('connecting')
+      this.hasAttemptedConnection = true
+    }
     const socket = new WebSocket(environment.websocketUrl)
     this.socket = socket
 
