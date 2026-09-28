@@ -2,7 +2,6 @@ import { environment } from '../config/environment'
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
-const ECHO_MESSAGE = 'Hello EventDeck'
 const RECONNECT_DELAY_MS = 2_000
 
 export class EventDeckWebSocket {
@@ -23,9 +22,8 @@ export class EventDeckWebSocket {
       if (socket !== this.socket) return
       console.info('WebSocket connected')
       this.onStatusChange('connected')
-      socket.send(ECHO_MESSAGE)
     })
-    socket.addEventListener('message', (event) => console.info('Echo response:', event.data))
+    socket.addEventListener('message', (event) => console.info('EventDeck event:', event.data))
     socket.addEventListener('error', () => socket.close())
     socket.addEventListener('close', () => {
       if (socket !== this.socket) return

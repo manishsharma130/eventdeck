@@ -1,11 +1,12 @@
-import { createServer } from './server.js'
-import { WEBSOCKET_URL } from './websocket.js'
+import { startServer } from './server/start-server.js'
 
-const server = createServer()
+let runtime: Awaited<ReturnType<typeof startServer>> | undefined
 
 try {
-  await server.start()
-  console.log(`\nEventDeck\n\n✓ Local server started\n✓ WebSocket ready\n✓ Listening on ${WEBSOCKET_URL}\n\nPress Ctrl+C to stop.`)
+  runtime = await startServer()
+  const address = runtime.app.server.address()
+  const port = typeof address === 'object' && address ? address.port : runtime.config.port
+  console.log(`\nEventDeck\n\n✓ Local server started\n✓ HTTP ready at http://${runtime.config.host}:${port}\n✓ WebSocket ready at ws://${runtime.config.host}:${port}/ws\n\nPress Ctrl+C to stop.`)
 } catch (error) {
   console.error(`Unable to start EventDeck: ${error instanceof Error ? error.message : String(error)}`)
   process.exit(1)
@@ -16,7 +17,7 @@ const shutdown = async () => {
   if (shuttingDown) return
   shuttingDown = true
   console.log('\nStopping EventDeck...')
-  await server.close()
+  await runtime?.close()
   process.exit(0)
 }
 

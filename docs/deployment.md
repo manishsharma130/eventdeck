@@ -1,6 +1,6 @@
 # Web deployment
 
-[← Back to README](../README.md) · [Architecture](architecture.md) · [File reference](file-reference.md) · [Development guide](development.md)
+[← Back to README](../README.md) · [Server setup](server-foundation-setup.md) · [Architecture](architecture.md) · [File reference](file-reference.md) · [Development guide](development.md)
 
 ## One-time repository setup
 
@@ -44,7 +44,7 @@ Vite uses `/eventdeck/` as its production base, ensuring JavaScript and CSS asse
 The hosted page uses HTTPS while the initial local endpoint uses:
 
 ```text
-ws://127.0.0.1:4732
+ws://127.0.0.1:4732/ws
 ```
 
 Browsers may block this connection as mixed content or apply loopback/private-network access restrictions. This behavior can differ between browser versions and security configurations.
