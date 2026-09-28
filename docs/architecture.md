@@ -1,6 +1,6 @@
 # EventDeck architecture
 
-[← Back to README](../README.md) · [File reference](file-reference.md) · [Development guide](development.md) · [Deployment](deployment.md)
+[← Back to README](../README.md) · [Server setup](server-foundation-setup.md) · [File reference](file-reference.md) · [Development guide](development.md) · [Deployment](deployment.md)
 
 ## Architecture overview
 
@@ -24,7 +24,7 @@ flowchart LR
         CLI --> Server
     end
 
-    Client <-->|ws://127.0.0.1:4732| Server
+    Client <-->|ws://127.0.0.1:4732/ws| Server
 ```
 
 The browser never imports server code, and the server never contains frontend code. Their only runtime relationship is the WebSocket connection.
@@ -71,7 +71,7 @@ flowchart TD
 ```
 
 - **Presentation:** `App.tsx` converts connection state into visible text.
-- **Transport:** `services/websocket.ts` creates the socket, handles events, sends the echo message, and reconnects.
+- **Transport:** `services/websocket.ts` creates the socket, handles versioned events, and reconnects.
 - **Configuration:** `config/environment.ts` owns the endpoint and supports environment overrides.
 - **Build:** Vite converts the React source into static files under `apps/web/dist`.
 
@@ -86,20 +86,23 @@ flowchart TD
     Command[eventdeck command]
     Bin[bin/eventdeck.js<br/>Stable executable]
     CLI[src/cli.ts<br/>Process lifecycle]
-    Core[src/server.ts<br/>WebSocket behavior]
-    Network[src/websocket.ts<br/>Host and port constants]
+    Core[src/server/<br/>Factory and lifecycle]
+    Transport[src/api and src/websocket<br/>HTTP and realtime transport]
+    Database[src/database<br/>SQLite and migrations]
     Output[dist/<br/>Compiled JavaScript]
 
     Command --> Bin
     Bin --> Output
     Output --> CLI
     CLI --> Core
-    Network --> Core
+    Core --> Transport
+    Core --> Database
 ```
 
 - **CLI lifecycle:** starts the service, prints status, catches errors, and handles `Ctrl+C` or termination signals.
-- **Server lifecycle:** opens and closes the WebSocket server and echoes messages.
-- **Network configuration:** defines `127.0.0.1`, port `4732`, and the complete URL in one place.
+- **Server lifecycle:** composes dependencies, starts Fastify, and cleanly closes WebSocket clients and SQLite.
+- **Transport:** exposes `/health`, `/api/status`, and `/ws`; WebSocket messages use a versioned envelope.
+- **Persistence:** configures SQLite pragmas, runs migrations, and stores recordings, event definitions, flows, and selected-flow configuration.
 
 The stable JavaScript file under `bin` loads compiled output from `dist`, so npm users run production JavaScript rather than TypeScript source.
 
@@ -113,11 +116,10 @@ sequenceDiagram
 
     UI->>Client: connect()
     Client-->>UI: connecting
-    Client->>Server: Open ws://127.0.0.1:4732
+    Client->>Server: Open ws://127.0.0.1:4732/ws
     Server-->>Client: Connection accepted
     Client-->>UI: connected
-    Client->>Server: Hello EventDeck
-    Server-->>Client: Hello EventDeck
+    Server-->>Client: connection.ready envelope
 
     Note over Client,Server: Server stops or connection closes
     Client-->>UI: disconnected
@@ -125,7 +127,7 @@ sequenceDiagram
     Client->>Server: Retry connection
 ```
 
-The echo message proves that the browser can send to and receive from the local process, rather than merely opening a socket.
+The ready envelope proves that the browser can receive the standardized realtime protocol from the local process.
 
 ## Build and delivery architecture
 

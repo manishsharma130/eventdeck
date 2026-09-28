@@ -1,6 +1,6 @@
 # Development and npm packaging
 
-[← Back to README](../README.md) · [Architecture](architecture.md) · [File reference](file-reference.md) · [Deployment](deployment.md)
+[← Back to README](../README.md) · [Server setup](server-foundation-setup.md) · [Architecture](architecture.md) · [File reference](file-reference.md) · [Deployment](deployment.md)
 
 ## Requirements
 
@@ -33,28 +33,40 @@ Terminal 2:
 pnpm dev:web
 ```
 
-Open the Vite URL, normally `http://localhost:5173`. The page reports whether the server at `ws://127.0.0.1:4732` is reachable.
+Open the Vite URL, normally `http://localhost:5173`. The page reports whether the server at `ws://127.0.0.1:4732/ws` is reachable.
 
-## Verify connection and echo behavior
+## Verify server behavior
 
 With both processes running, the page displays `Connected with EventDeck`. Open the browser developer console and confirm:
 
 ```text
 WebSocket connected
-Echo response: Hello EventDeck
+EventDeck event: {"type":"connection.ready",...}
 ```
 
 Stop the server with `Ctrl+C`. The page changes to `Not connected with EventDeck`. Restarting the server should restore the connection without a page refresh.
 
 ## Environment configuration
 
-The web client defaults to `ws://127.0.0.1:4732`. Override it for development or a build with:
+Override the web client endpoint for development or a build with:
 
 ```bash
-VITE_EVENTDECK_WEBSOCKET_URL=ws://127.0.0.1:5000 pnpm dev:web
+VITE_EVENTDECK_WEBSOCKET_URL=ws://127.0.0.1:5000/ws pnpm dev:web
 ```
 
-The server currently uses the fixed, centralized port `4732`.
+The server supports `EVENTDECK_HOST`, `EVENTDECK_PORT`, `EVENTDECK_DB_PATH`, and `EVENTDECK_LOG_LEVEL`. Defaults are `127.0.0.1`, `4732`, `~/.eventdeck/eventdeck.db`, and `info`.
+
+The browser defaults to `ws://127.0.0.1:4732/ws`.
+
+## Test
+
+Run the isolated API, SQLite, and WebSocket tests:
+
+```bash
+pnpm test:server
+```
+
+Tests use Fastify injection, ephemeral ports, and temporary SQLite files; they never access the user's EventDeck database.
 
 ## Type-check
 
