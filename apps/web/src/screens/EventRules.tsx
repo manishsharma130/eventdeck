@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FileText, MoreVertical, Plus, Search, Trash2 } from 'lucide-react'
-import { eventDefinitions } from '../data/mockData'
 import { Button, Checkbox, Input, PageHeader, Panel, Select } from '../components/ui'
+import { api, type EventDefinition, type MatchType } from '../services/api'
 
 type Rule = { parameter: string; condition: string; value: string; priority: number }
 
 export function EventRules() {
-  const [selected, setSelected] = useState(0)
-  const [checked, setChecked] = useState<number[]>([])
+  const [definitions, setDefinitions] = useState<EventDefinition[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [checked, setChecked] = useState<string[]>([])
   const [query, setQuery] = useState('')
   const [eventName, setEventName] = useState('')
   const [eventValue, setEventValue] = useState('app_open')
@@ -16,27 +17,37 @@ export function EventRules() {
     { parameter: 'screenName', condition: 'Contains', value: 'home', priority: 2 },
     { parameter: 'referrer', condition: 'Regex', value: '^(organic|ads)$', priority: 3 },
   ])
-  const list = useMemo(() => eventDefinitions.filter(([name]) => name.includes(query.toLowerCase())), [query])
-  const choose = (index: number, name: string) => { setSelected(index); setEventValue(name); setEventName('') }
+  const [message, setMessage] = useState('Loading event rules…')
+  const list = useMemo(() => definitions.filter((item) => `${item.name} ${item.eventValue}`.toLowerCase().includes(query.toLowerCase())), [definitions, query])
+  const choose = (definition: EventDefinition) => { setSelectedId(definition.id); setEventValue(definition.eventValue); setEventName(definition.name); setRules(definition.rules.map((rule, index) => ({ parameter: rule.paramKey, condition: rule.matchType === 'exact' ? 'Match' : `${rule.matchType[0].toUpperCase()}${rule.matchType.slice(1)}`, value: rule.expectedValue ?? '', priority: index + 1 }))) }
   const updateRule = (index: number, key: keyof Rule, value: string | number) => setRules((current) => current.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, [key]: value } : rule))
+  const clear = () => { setSelectedId(null); setEventName(''); setEventValue(''); setRules([]); setMessage('') }
+  const refresh = async () => { try { const items = await api.rules(); setDefinitions(items); setMessage(items.length ? '' : 'No event rules yet.') } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Could not load event rules.') } }
+  useEffect(() => { void refresh() }, [])
+  const save = async () => {
+    const input = { name: eventName.trim() || eventValue.trim(), eventValue: eventValue.trim(), rules: rules.map((rule) => ({ paramKey: rule.parameter, matchType: (rule.condition === 'Match' ? 'exact' : rule.condition.toLowerCase()) as MatchType, ...(rule.condition === 'Exists' ? {} : { expectedValue: rule.value }) })) }
+    try { if (selectedId) await api.updateRule(selectedId, input); else await api.createRule(input); await refresh(); clear(); setMessage('Event rule saved.') } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Could not save event rule.') }
+  }
+  const remove = async (ids: string[]) => { try { await Promise.all(ids.map((id) => api.deleteRule(id))); setChecked([]); if (selectedId && ids.includes(selectedId)) clear(); await refresh(); setMessage('Event rule deleted.') } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Could not delete event rule.') } }
 
   return (
     <div className="screen">
       <PageHeader title="Event Rules" description="Define reusable event definitions and rules to capture and process important in-app events." />
       <div className="split-grid rules-grid">
         <Panel className="list-panel">
-          <div className="toolbar"><Button variant="primary"><Plus size={20} />Add Event</Button><Button disabled={!checked.length}><Trash2 size={18} />Delete</Button><span className="toolbar-separator" /><Button><Trash2 size={18} />Delete All</Button></div>
+          <div className="toolbar"><Button variant="primary" onClick={clear}><Plus size={20} />Add Event</Button><Button disabled={!checked.length} onClick={() => void remove(checked)}><Trash2 size={18} />Delete</Button><span className="toolbar-separator" /><Button disabled={!definitions.length} onClick={() => void remove(definitions.map((item) => item.id))}><Trash2 size={18} />Delete All</Button></div>
           <div className="compact-filters"><label className="search-field"><Search size={19} /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search events..." /></label><Select><option>All Tags</option></Select></div>
           <div className="definition-list">
-            {list.map(([name, count], index) => (
-              <button key={name} className={`definition-row ${selected === index ? 'selected' : ''}`} onClick={() => choose(index, name)}>
-                <Checkbox label={`Select ${name}`} checked={checked.includes(index)} onChange={() => setChecked((value) => value.includes(index) ? value.filter((item) => item !== index) : [...value, index])} />
+            {list.map((definition, index) => (
+              <button key={definition.id} className={`definition-row ${selectedId === definition.id ? 'selected' : ''}`} onClick={() => choose(definition)}>
+                <Checkbox label={`Select ${definition.name}`} checked={checked.includes(definition.id)} onChange={() => setChecked((value) => value.includes(definition.id) ? value.filter((item) => item !== definition.id) : [...value, definition.id])} />
                 <span className="sequence">{String(index + 1).padStart(3, '0')}</span>
-                <span className="definition-name"><strong>{name}</strong><small>Value: {name}</small></span>
-                <span className={`rule-count ${count ? 'has-rules' : ''}`}><FileText size={20} />{count ? `${count} ${count === 1 ? 'rule' : 'rules'}` : 'No rules'}</span>
+                <span className="definition-name"><strong>{definition.name}</strong><small>Value: {definition.eventValue}</small></span>
+                <span className={`rule-count ${definition.rules.length ? 'has-rules' : ''}`}><FileText size={20} />{definition.rules.length ? `${definition.rules.length} ${definition.rules.length === 1 ? 'rule' : 'rules'}` : 'No rules'}</span>
                 <MoreVertical size={18} />
               </button>
             ))}
+            {message && <div className="empty-list" role="status">{message}</div>}
           </div>
         </Panel>
         <Panel className="form-panel">
@@ -52,7 +63,7 @@ export function EventRules() {
               <button aria-label="Delete rule" onClick={() => setRules(rules.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={18} /></button>
             </div>)}
           </div>
-          <div className="form-actions"><Button>Clear</Button><Button variant="primary" disabled={!eventValue.trim()}>Save</Button></div>
+          <div className="form-actions"><Button onClick={clear}>Clear</Button><Button variant="primary" disabled={!eventValue.trim()} onClick={() => void save()}>Save</Button></div>
         </Panel>
       </div>
     </div>

@@ -14,6 +14,17 @@ function runAdb(arguments_: string[]): Promise<string> {
   })
 }
 
+/** Returns only the message from a tag-formatted AnalyticsEvent line. */
+export function extractAnalyticsEventMessage(line: string): string | null {
+  const match = line.trim().match(/^(?:[VDIWEF]\/)?AnalyticsEvent(?:\(\s*\d+\))?:\s*(.+)$/)
+  return match?.[1]?.trim() || null
+}
+
+function currentLogcatTime(now = new Date()): string {
+  const pad = (value: number, length = 2) => String(value).padStart(length, '0')
+  return `${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${pad(now.getMilliseconds(), 3)}`
+}
+
 export class RealAdbClient implements AdbClient {
   async listDevices(): Promise<AdbDevice[]> {
     const output = await runAdb(['devices', '-l'])
@@ -25,9 +36,14 @@ export class RealAdbClient implements AdbClient {
   }
 
   async startAnalyticsLogcat(deviceId: string, onMessage: (message: string) => void, onError: (error: Error) => void): Promise<LogcatHandle> {
-    const process = spawn('adb', ['-s', deviceId, 'logcat', '-v', 'raw', '-s', 'AnalyticsEvent:I', '*:S'], { stdio: ['ignore', 'pipe', 'pipe'] })
+    // Keep the tag in the output so only AnalyticsEvent message payloads can
+    // reach the JSON parser. :V includes events emitted with Log.d().
+    const process = spawn('adb', ['-s', deviceId, 'logcat', '-v', 'tag', '-T', currentLogcatTime(), '-s', 'AnalyticsEvent:V', '*:S'], { stdio: ['ignore', 'pipe', 'pipe'] })
     const lines = createInterface({ input: process.stdout })
-    lines.on('line', (line) => { if (line.trim()) onMessage(line.trim()) })
+    lines.on('line', (line) => {
+      const message = extractAnalyticsEventMessage(line)
+      if (message) onMessage(message)
+    })
     process.stderr.setEncoding('utf8').on('data', (chunk: string) => onError(new Error(chunk.trim())))
     process.once('error', onError)
     return {

@@ -1,3 +1,6 @@
+const websocketProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+
 export const environment = {
-  websocketUrl: import.meta.env.VITE_EVENTDECK_WEBSOCKET_URL ?? 'ws://127.0.0.1:4732/ws',
+  apiUrl: import.meta.env.VITE_EVENTDECK_API_URL ?? '',
+  websocketUrl: import.meta.env.VITE_EVENTDECK_WEBSOCKET_URL ?? `${websocketProtocol}//${window.location.host}/ws`,
 } as const
