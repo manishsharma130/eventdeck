@@ -165,10 +165,10 @@ export function Checkbox({ checked, onChange, label }: { checked?: boolean; onCh
   return <button className={`checkbox ${checked ? 'checked' : ''}`} role="checkbox" aria-checked={checked} aria-label={label} onClick={onChange}>{checked && '✓'}</button>
 }
 
-export function Modal({ title, children, actions, onClose }: { title: string; children: ReactNode; actions: ReactNode; onClose: () => void }) {
+export function Modal({ title, children, actions, onClose, className = '' }: { title: string; children: ReactNode; actions: ReactNode; onClose: () => void; className?: string }) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onMouseDown={(event) => event.stopPropagation()}>
+      <div className={`modal ${className}`} role="dialog" aria-modal="true" aria-labelledby="modal-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-head"><h2 id="modal-title">{title}</h2><IconButton label="Close" bare onClick={onClose}>×</IconButton></div>
         <div className="modal-body">{children}</div>
         <div className="modal-actions">{actions}</div>
