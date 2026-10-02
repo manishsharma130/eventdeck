@@ -1,23 +1,24 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { GripVertical, Plus, Search, Trash2, X } from 'lucide-react'
 import { Button, Checkbox, IconButton, Input, Modal, PageHeader, Panel } from '../components/ui'
 import { api, ApiError, type EventDefinition, type Flow } from '../services/api'
+import { useTabState } from '../state/tab-ui-store'
 
 export function BuildFlow() {
-  const [query, setQuery] = useState('')
-  const [flows, setFlows] = useState<Flow[]>([])
-  const [definitions, setDefinitions] = useState<EventDefinition[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [checked, setChecked] = useState<string[]>([])
-  const [name, setName] = useState('')
-  const [selectedEvents, setSelectedEvents] = useState<string[]>([])
-  const [creationOpen, setCreationOpen] = useState(false)
-  const [eventPickerOpen, setEventPickerOpen] = useState(false)
-  const [eventQuery, setEventQuery] = useState('')
-  const [draftEvents, setDraftEvents] = useState<string[]>([])
-  const [duplicateName, setDuplicateName] = useState('')
-  const [draggedEventId, setDraggedEventId] = useState<string | null>(null)
-  const [message, setMessage] = useState('Loading flows…')
+  const [query, setQuery] = useTabState('build', 'query', '')
+  const [flows, setFlows] = useTabState<Flow[]>('build', 'flows', [])
+  const [definitions, setDefinitions] = useTabState<EventDefinition[]>('build', 'definitions', [])
+  const [selectedId, setSelectedId] = useTabState<string | null>('build', 'selectedId', null)
+  const [checked, setChecked] = useTabState<string[]>('build', 'checked', [])
+  const [name, setName] = useTabState('build', 'name', '')
+  const [selectedEvents, setSelectedEvents] = useTabState<string[]>('build', 'selectedEvents', [])
+  const [creationOpen, setCreationOpen] = useTabState('build', 'creationOpen', false)
+  const [eventPickerOpen, setEventPickerOpen] = useTabState('build', 'eventPickerOpen', false)
+  const [eventQuery, setEventQuery] = useTabState('build', 'eventQuery', '')
+  const [draftEvents, setDraftEvents] = useTabState<string[]>('build', 'draftEvents', [])
+  const [duplicateName, setDuplicateName] = useTabState('build', 'duplicateName', '')
+  const [draggedEventId, setDraggedEventId] = useTabState<string | null>('build', 'draggedEventId', null)
+  const [message, setMessage] = useTabState('build', 'message', 'Loading flows…')
   const filtered = useMemo(() => flows.filter((flow) => flow.name.toLowerCase().includes(query.toLowerCase())), [flows, query])
   const filteredDefinitions = useMemo(() => definitions.filter((definition) =>
     `${definition.name} ${definition.eventValue}`.toLowerCase().includes(eventQuery.toLowerCase()),

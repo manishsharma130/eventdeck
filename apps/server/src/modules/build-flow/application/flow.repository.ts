@@ -7,5 +7,6 @@ export interface FlowRepository {
   deleteMany(ids: string[]): number
   findById(id: string): Flow | null
   findByName(name: string): Flow | null
+  findManyByIds(ids: string[]): Flow[]
   list(search?: string): Flow[]
 }

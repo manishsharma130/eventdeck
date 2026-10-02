@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Circle, MoreVertical, Pause, Play, Search, Square, Trash2, X } from 'lucide-react'
 import { Button, CopyButton, IconButton, Input, Modal, Select, TagBadge } from '../components/ui'
 import { api } from '../services/api'
 import { useLiveStreamStore, type StreamEvent } from '../state/live-stream-store'
+import { useTabState } from '../state/tab-ui-store'
 
 const tones = { 'Firebase Analytics': 'blue', firebase_analytics: 'blue', Firebase: 'blue', 'Google Analytics': 'green', google_analytics: 'green', MoEngage: 'purple', moengage: 'purple' } as const
 const defaultTags = [
@@ -25,9 +26,9 @@ function EventRow({ event, selected, onSelect }: { event: AnalyticsEvent; select
 }
 
 export function LiveStream() {
-  const [saveModal, setSaveModal] = useState(false)
-  const [sessionName, setSessionName] = useState('')
-  const [deviceRequired, setDeviceRequired] = useState(false)
+  const [saveModal, setSaveModal] = useTabState('live', 'saveModal', false)
+  const [sessionName, setSessionName] = useTabState('live', 'sessionName', '')
+  const [deviceRequired, setDeviceRequired] = useTabState('live', 'deviceRequired', false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const runtime = useLiveStreamStore((state) => state.runtime)
   const visibleEvents = useLiveStreamStore((state) => state.events)

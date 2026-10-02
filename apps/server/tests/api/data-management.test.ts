@@ -58,4 +58,39 @@ describe('consolidated data management APIs', () => {
     const batchDelete = await app.inject({ method: 'DELETE', url: '/api/flows', payload: { ids: [first.json<{ id: string }>().id, second.json<{ id: string }>().id] } })
     expect(batchDelete.json()).toEqual({ deleted: 2 })
   })
+
+  it('validates same-name definitions once across flows and keeps an immutable active snapshot', async () => {
+    const home = (await app.inject({ method: 'POST', url: '/api/event-rules', payload: {
+      name: 'Home Open', eventValue: 'screen_open', rules: [{ paramKey: 'screen', matchType: 'exact', expectedValue: 'home' }],
+    } })).json<{ id: string }>()
+    const search = (await app.inject({ method: 'POST', url: '/api/event-rules', payload: {
+      name: 'Search Open', eventValue: 'screen_open', rules: [{ paramKey: 'screen', matchType: 'exact', expectedValue: 'search' }],
+    } })).json<{ id: string }>()
+    const first = (await app.inject({ method: 'POST', url: '/api/flows', payload: { name: 'Discovery', eventDefinitionIds: [home.id, search.id] } })).json<{ id: string }>()
+    const second = (await app.inject({ method: 'POST', url: '/api/flows', payload: { name: 'Home Only', eventDefinitionIds: [home.id] } })).json<{ id: string }>()
+    await app.inject({ method: 'PUT', url: '/api/flow-execution/selected-flows', payload: { flowIds: [first.id, second.id] } })
+    await app.inject({ method: 'POST', url: '/api/flow-execution/validate', payload: {} })
+
+    const locked = await app.inject({ method: 'PUT', url: '/api/flow-execution/selected-flows', payload: { flowIds: [second.id] } })
+    expect(locked.statusCode).toBe(409)
+    expect(locked.json().error.code).toBe('VALIDATION_ACTIVE_SELECTION_LOCKED')
+
+    const firstHome = dependencies.flowExecutionService.handleEvent({ eventName: 'screen_open', eventParams: { screen: 'home' } })
+    expect(firstHome).toHaveLength(1)
+    expect(firstHome[0].affectedFlows).toHaveLength(2)
+    expect(dependencies.flowExecutionService.handleEvent({ eventName: 'screen_open', eventParams: { screen: 'home' } })).toEqual([])
+
+    await app.inject({ method: 'PUT', url: `/api/event-rules/${search.id}`, payload: {
+      name: 'Search Open', eventValue: 'screen_open', rules: [{ paramKey: 'screen', matchType: 'exact', expectedValue: 'profile' }],
+    } })
+    const snapshotMatch = dependencies.flowExecutionService.handleEvent({ eventName: 'screen_open', eventParams: { screen: 'search' } })
+    expect(snapshotMatch).toHaveLength(1)
+    expect(snapshotMatch[0].eventDefinitionId).toBe(search.id)
+
+    const completed = await app.inject({ method: 'POST', url: '/api/flow-execution/stop', payload: {} })
+    expect(completed.json().flows).toEqual([
+      expect.objectContaining({ flowIndex: 0, status: 'PASSED', passedEvents: 2, failedEvents: 0 }),
+      expect.objectContaining({ flowIndex: 1, status: 'PASSED', passedEvents: 1, failedEvents: 0 }),
+    ])
+  })
 })

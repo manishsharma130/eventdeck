@@ -14,13 +14,17 @@ export class FlowSelectionService {
     private readonly id: () => string = randomUUID,
   ) {}
   getSelected(): SelectedFlow[] {
-    return this.selected.listIds().map((id, position) => {
-      const flow = this.flows.findById(id)
+    const selectedIds = this.selected.listIds()
+    const flowsById = new Map(this.flows.findManyByIds(selectedIds).map((flow) => [flow.id, flow]))
+    const definitionIds = [...new Set([...flowsById.values()].flatMap((flow) => flow.events.map((event) => event.eventDefinitionId)))]
+    const definitionsById = new Map(this.definitions.findManyByIds(definitionIds).map((definition) => [definition.id, definition]))
+    return selectedIds.map((id, position) => {
+      const flow = flowsById.get(id)
       if (!flow) throw new AppError('FLOW_NOT_FOUND', `Selected flow '${id}' was not found.`, 500)
       return {
         flowId: flow.id, name: flow.name, position,
         events: flow.events.map((event) => {
-          const definition = this.definitions.findById(event.eventDefinitionId)
+          const definition = definitionsById.get(event.eventDefinitionId)
           if (!definition) throw new AppError('EVENT_DEFINITION_NOT_FOUND', `Definition '${event.eventDefinitionId}' was not found.`, 500)
           return { flowEventId: event.id, eventDefinitionId: definition.id, eventName: definition.eventValue, eventDefinitionName: definition.name, position: event.position, rules: definition.rules }
         }),

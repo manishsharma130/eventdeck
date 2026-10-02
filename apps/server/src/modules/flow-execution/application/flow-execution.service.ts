@@ -3,7 +3,7 @@ import type { WebSocketGateway } from '../../../websocket/websocket.types.js'
 import { compileDefinition, matchesDefinition, type CompiledEventDefinition } from '../../event-rules/domain/event-rule.matcher.js'
 import type { LiveEvent } from '../../event-rules/domain/event-rule.types.js'
 import type { LiveEventBus } from '../../live-stream/application/live-event-bus.js'
-import type { DefinitionPassedUpdate, ExecutionEventStatus, ExecutionStopReason, FlowReference, SelectedFlow, ValidationCompleted } from '../domain/flow-execution.types.js'
+import type { DefinitionPassedUpdate, ExecutionEventStatus, ExecutionStopReason, FlowReference, SelectedFlow, ValidationCompleted, ValidationErrorUpdate } from '../domain/flow-execution.types.js'
 import type { FlowSelectionService } from './flow-selection.service.js'
 
 type RuntimeDefinition = { definition: CompiledEventDefinition; passed: boolean; flowReferences: FlowReference[] }
@@ -12,12 +12,15 @@ type ExecutionContext = { active: boolean; eventIndex: Map<string, RuntimeDefini
 
 export class FlowExecutionService {
   private context: ExecutionContext | null = null
+  private lastCompletion: ValidationCompleted | null = null
   constructor(private readonly selection: FlowSelectionService, private readonly websocket: WebSocketGateway, eventBus: LiveEventBus) {
     eventBus.subscribe((event) => this.handleEvent(event))
   }
   getState(): { active: boolean; flows: RuntimeFlow[] } { return { active: this.context?.active ?? false, flows: this.context?.flows ?? [] } }
+  getLastCompletion(): ValidationCompleted | null { return this.lastCompletion }
   start(): { status: 'started'; flows: RuntimeFlow[] } {
     if (this.context?.active) throw new AppError('VALIDATION_ALREADY_ACTIVE', 'Flow validation is already active.', 409)
+    this.lastCompletion = null
     const selected = this.selection.getSelected()
     if (selected.length === 0) throw new AppError('NO_FLOWS_SELECTED', 'Select at least one flow before validation.', 400)
     const flows: RuntimeFlow[] = selected.map((flow, flowIndex) => ({ ...flow, flowIndex, events: flow.events.map((event) => ({ ...event, status: 'PENDING' })) }))
@@ -41,8 +44,8 @@ export class FlowExecutionService {
   handleEvent(event: LiveEvent): DefinitionPassedUpdate[] {
     if (!this.context?.active) return []
     const updates: DefinitionPassedUpdate[] = []
-    try {
-      for (const runtime of this.context.eventIndex.get(event.eventName) ?? []) {
+    for (const runtime of this.context.eventIndex.get(event.eventName) ?? []) {
+      try {
         if (runtime.passed || !matchesDefinition(event, runtime.definition)) continue
         runtime.passed = true
         for (const reference of runtime.flowReferences) this.context.flows[reference.flowIndex].events[reference.eventIndex].status = 'PASSED'
@@ -51,9 +54,12 @@ export class FlowExecutionService {
         }
         updates.push(update)
         this.websocket.broadcast(update.type, { eventDefinitionId: update.eventDefinitionId, eventName: update.eventName, affectedFlows: update.affectedFlows })
+      } catch (error) {
+        const failure: ValidationErrorUpdate = { type: 'flow_execution.validation_error', message: error instanceof Error ? error.message : String(error), eventDefinitionId: runtime.definition.id, eventName: runtime.definition.eventValue }
+        this.websocket.broadcast(failure.type, { message: failure.message, eventDefinitionId: failure.eventDefinitionId, eventName: failure.eventName })
+        this.stop('EXECUTION_ERROR')
+        return updates
       }
-    } catch (error) {
-      this.websocket.broadcast('flow_execution.validation_error', { message: error instanceof Error ? error.message : String(error) })
     }
     return updates
   }
@@ -75,6 +81,7 @@ export class FlowExecutionService {
       }),
     }
     this.websocket.broadcast(result.type, { reason: result.reason, flows: result.flows })
+    this.lastCompletion = result
     return result
   }
 }

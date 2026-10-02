@@ -1,24 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { FileText, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react'
 import { Button, Checkbox, IconButton, Input, Modal, PageHeader, Panel, Select } from '../components/ui'
 import { api, ApiError, type EventDefinition, type MatchType } from '../services/api'
+import { useTabState } from '../state/tab-ui-store'
 
 type Rule = { parameter: string; condition: MatchType; value: string }
 const emptyRule = (): Rule => ({ parameter: '', condition: 'exact', value: '' })
 
 export function EventRules() {
-  const [definitions, setDefinitions] = useState<EventDefinition[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [checked, setChecked] = useState<string[]>([])
-  const [searchDraft, setSearchDraft] = useState('')
-  const [query, setQuery] = useState('')
-  const [formOpen, setFormOpen] = useState(false)
-  const [eventName, setEventName] = useState('')
-  const [eventValue, setEventValue] = useState('')
-  const [rules, setRules] = useState<Rule[]>([])
-  const [message, setMessage] = useState('Loading event rules…')
-  const [duplicateMessage, setDuplicateMessage] = useState('')
-  const [pendingDelete, setPendingDelete] = useState<{ ids: string[]; flowCount: number } | null>(null)
+  const [definitions, setDefinitions] = useTabState<EventDefinition[]>('rules', 'definitions', [])
+  const [selectedId, setSelectedId] = useTabState<string | null>('rules', 'selectedId', null)
+  const [checked, setChecked] = useTabState<string[]>('rules', 'checked', [])
+  const [searchDraft, setSearchDraft] = useTabState('rules', 'searchDraft', '')
+  const [query, setQuery] = useTabState('rules', 'query', '')
+  const [formOpen, setFormOpen] = useTabState('rules', 'formOpen', false)
+  const [eventName, setEventName] = useTabState('rules', 'eventName', '')
+  const [eventValue, setEventValue] = useTabState('rules', 'eventValue', '')
+  const [rules, setRules] = useTabState<Rule[]>('rules', 'rules', [])
+  const [message, setMessage] = useTabState('rules', 'message', 'Loading event rules…')
+  const [duplicateMessage, setDuplicateMessage] = useTabState('rules', 'duplicateMessage', '')
+  const [pendingDelete, setPendingDelete] = useTabState<{ ids: string[]; flowCount: number } | null>('rules', 'pendingDelete', null)
 
   const list = useMemo(() => definitions.filter((item) =>
     `${item.name} ${item.eventValue}`.toLowerCase().includes(query.toLowerCase()),

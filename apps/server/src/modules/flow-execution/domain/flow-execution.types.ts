@@ -8,6 +8,7 @@ export type FlowReference = { flowId: string; flowIndex: number; flowEventId: st
 export type ExecutionEventStatus = 'PENDING' | 'PASSED' | 'FAILED'
 export type ExecutionStopReason = 'USER_STOPPED' | 'SOURCE_COMPLETED' | 'EXECUTION_ERROR'
 export type DefinitionPassedUpdate = { type: 'flow_execution.event_definition_passed'; eventDefinitionId: string; eventName: string; affectedFlows: FlowReference[] }
+export type ValidationErrorUpdate = { type: 'flow_execution.validation_error'; message: string; eventDefinitionId?: string; eventName?: string }
 export type ValidationCompleted = {
   type: 'flow_execution.validation_completed'; reason: ExecutionStopReason
   flows: Array<{

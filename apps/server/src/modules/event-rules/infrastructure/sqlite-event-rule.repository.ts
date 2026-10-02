@@ -75,23 +75,38 @@ export class SqliteEventRuleRepository implements EventRuleRepository {
     })
   }
 
+  findManyByIds(ids: string[]): EventDefinition[] {
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return []
+    const placeholders = uniqueIds.map(() => '?').join(',')
+    return this.database.access((db) => this.mapJoinedRows(db.prepare(`SELECT d.id, d.name, d.event_value, d.created_at, d.updated_at,
+      r.id AS rule_id, r.param_key, r.match_type, r.expected_value
+      FROM event_definitions d LEFT JOIN event_rule_conditions r ON r.event_definition_id = d.id
+      WHERE d.id IN (${placeholders})
+      ORDER BY d.name COLLATE NOCASE, r.param_key, r.match_type, r.expected_value`).all(...uniqueIds) as DefinitionWithRuleRow[]))
+  }
+
   list(): EventDefinition[] {
     return this.database.access((db) => {
       const rows = db.prepare(`SELECT d.id, d.name, d.event_value, d.created_at, d.updated_at,
         r.id AS rule_id, r.param_key, r.match_type, r.expected_value
         FROM event_definitions d LEFT JOIN event_rule_conditions r ON r.event_definition_id = d.id
         ORDER BY d.name COLLATE NOCASE, r.param_key, r.match_type, r.expected_value`).all() as DefinitionWithRuleRow[]
-      const definitions = new Map<string, EventDefinition>()
-      for (const row of rows) {
-        let definition = definitions.get(row.id)
-        if (!definition) {
-          definition = { id: row.id, name: row.name, eventValue: row.event_value, createdAt: row.created_at, updatedAt: row.updated_at, rules: [] }
-          definitions.set(row.id, definition)
-        }
-        if (row.rule_id && row.param_key && row.match_type) definition.rules.push({ id: row.rule_id, paramKey: row.param_key, matchType: row.match_type, ...(row.expected_value === null ? {} : { expectedValue: row.expected_value }) })
-      }
-      return [...definitions.values()]
+      return this.mapJoinedRows(rows)
     })
+  }
+
+  private mapJoinedRows(rows: DefinitionWithRuleRow[]): EventDefinition[] {
+    const definitions = new Map<string, EventDefinition>()
+    for (const row of rows) {
+      let definition = definitions.get(row.id)
+      if (!definition) {
+        definition = { id: row.id, name: row.name, eventValue: row.event_value, createdAt: row.created_at, updatedAt: row.updated_at, rules: [] }
+        definitions.set(row.id, definition)
+      }
+      if (row.rule_id && row.param_key && row.match_type) definition.rules.push({ id: row.rule_id, paramKey: row.param_key, matchType: row.match_type, ...(row.expected_value === null ? {} : { expectedValue: row.expected_value }) })
+    }
+    return [...definitions.values()]
   }
 
   countFlowReferences(id: string): number {

@@ -8,6 +8,7 @@ export interface EventRuleRepository {
   findById(id: string): EventDefinition | null
   findByName(name: string): EventDefinition | null
   findBySignature(signature: string): EventDefinition | null
+  findManyByIds(ids: string[]): EventDefinition[]
   list(): EventDefinition[]
   countFlowReferences(id: string): number
   countFlowReferencesMany(ids: string[]): number
