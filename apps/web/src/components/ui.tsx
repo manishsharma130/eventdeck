@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type Inp
 import { createPortal } from 'react-dom'
 import {
   ChevronDown, CirclePlay, Copy, FileText, GitBranch, Pause,
-  Play, Radio, Smartphone, Square, UserRound,
+  Play, Radio, Smartphone, Square, UserRound, Video,
 } from 'lucide-react'
 import { api, ApiError, type Device } from '../services/api'
 import { useLiveStreamStore } from '../state/live-stream-store'
@@ -11,7 +11,7 @@ export type TabId = 'live' | 'rules' | 'build' | 'execution' | 'recordings'
 
 const navItems: { id: TabId; label: string; icon: typeof Radio }[] = [
   { id: 'live', label: 'Live Stream', icon: Radio },
-  { id: 'recordings', label: 'Recorded Sessions', icon: FileText },
+  { id: 'recordings', label: 'Recorded Sessions', icon: Video },
   { id: 'rules', label: 'Event Rules', icon: FileText },
   { id: 'build', label: 'Build Flow', icon: GitBranch },
   { id: 'execution', label: 'Flow Execution', icon: CirclePlay },
