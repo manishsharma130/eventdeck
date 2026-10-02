@@ -59,7 +59,6 @@ export function EventRules() {
 
   const save = async () => {
     const incompleteFields = [
-      ...(!eventName.trim() ? ['Event Name'] : []),
       ...(!eventValue.trim() ? ['Event Value'] : []),
       ...rules.flatMap((rule, index) => {
         const parameter = rule.parameter.trim()
@@ -80,15 +79,19 @@ export function EventRules() {
     }
     const editing = Boolean(selectedId)
     const input = {
-      name: eventName.trim(),
+      name: eventName.trim() || eventValue.trim(),
       eventValue: eventValue.trim(),
       rules: rules.map((rule) => ({ paramKey: rule.parameter.trim(), matchType: rule.condition, ...(rule.condition === 'exists' ? {} : { expectedValue: rule.value.trim() }) })),
     }
     try {
       const saved = selectedId ? await api.updateRule(selectedId, input) : await api.createRule(input)
       setDefinitions((current) => sortDefinitions(selectedId ? current.map((item) => item.id === saved.id ? saved : item) : [...current, saved]))
+      if (!editing) {
+        setSearchDraft('')
+        setQuery('')
+      }
       closeForm()
-      setMessage(editing ? 'Event rule updated.' : 'Event rule saved.')
+      setMessage('')
     } catch (cause) {
       if (cause instanceof ApiError && (cause.code === 'EVENT_NAME_ALREADY_EXISTS' || cause.code === 'EVENT_DEFINITION_ALREADY_EXISTS')) {
         setDuplicateMessage(`${cause.message} Please change the rules in order to make it different.`)
@@ -104,7 +107,7 @@ export function EventRules() {
       setDefinitions((current) => current.filter((item) => !removed.has(item.id)))
       setChecked([])
       if (selectedId && removed.has(selectedId)) closeForm()
-      setMessage('Event rule deleted.')
+      setMessage(definitions.length === removed.size ? 'No event rules yet.' : '')
     } catch (cause) { setDeleteError(cause instanceof Error ? cause.message : 'Could not delete event rule.') }
   }
   const requestRemove = async (ids: string[]) => {
@@ -133,11 +136,11 @@ export function EventRules() {
               <span className={`rule-count ${definition.rules.length ? 'has-rules' : ''}`}><FileText size={20} />{definition.rules.length ? `${definition.rules.length} ${definition.rules.length === 1 ? 'rule' : 'rules'}` : 'No rules'}</span>
               <MoreVertical size={18} />
             </div>} />}
-          {message && <div className="empty-list" role="status">{message}</div>}
+          {!list.length && <div className="empty-list" role="status">{query.trim() && definitions.length ? 'No matching events.' : message || 'No event rules yet.'}</div>}
         </Panel>
         {formOpen && <Panel className="form-panel">
           <div className="panel-title"><div><h2>Event Information</h2><p>Configure the event details and define matching rules.</p></div><IconButton bare label="Close event information" onClick={closeForm}><X size={19} /></IconButton></div>
-          <label className="field-label">Event Name <span>(Required)</span><Input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder="Enter a display name for this event..." /></label>
+          <label className="field-label">Event Name <span>(Optional)</span><Input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder="Defaults to Event Value when left blank" /></label>
           <label className="field-label">Event Value <span>(Required)</span><Input className="focused" value={eventValue} onChange={(event) => setEventValue(event.target.value)} placeholder="Enter the live event name..." /></label>
           <div className="rules-heading"><div><h3>Event Rules <span>(Optional)</span></h3><p>Define rules to match this event based on parameters, values, or patterns.</p></div><Button variant="primary" onClick={() => setRules((current) => [...current, emptyRule()])}><Plus size={19} />Add Rule</Button></div>
           <div className="rules-table"><div className="rule-table-head"><span>#</span><span>Event Parameter</span><span>Condition</span><span>Value</span><span /></div>

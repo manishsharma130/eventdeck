@@ -52,9 +52,10 @@ export function LiveStream() {
 
   const filtered = useMemo(() => visibleEvents.filter((event) => {
     const search = query.toLowerCase()
-    const matchesQuery = event.name.includes(search) || JSON.stringify(event.params).toLowerCase().includes(search)
+    const matchesQuery = event.name.toLowerCase().includes(search) || JSON.stringify(event.params).toLowerCase().includes(search)
     return matchesQuery && (tag === 'All Tags' || event.tag === tag)
   }), [query, tag, visibleEvents])
+  const hasActiveFilter = Boolean(query.trim()) || tag !== 'All Tags'
 
   const virtualizer = useVirtualizer({
     count: filtered.length,
@@ -121,11 +122,16 @@ export function LiveStream() {
               <option value="All Tags">All Tags</option>{tags.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </Select>
           </div>
-          <div className="event-count"><span className={`dot ${streamState === 'running' ? 'success' : ''}`} /><strong>{filtered.length}</strong> events · {streamState === 'running' ? 'streaming' : streamState}</div>
+          <div className="event-count" aria-label={`${visibleEvents.length} total events${hasActiveFilter ? `, ${filtered.length} matching events` : ''}, ${streamState === 'running' ? 'streaming' : streamState}`}>
+            <span className={`dot ${streamState === 'running' ? 'success' : ''}`} />
+            <span><strong>{visibleEvents.length}</strong> total events</span>
+            {hasActiveFilter && <><i /><span><strong>{filtered.length}</strong> {query.trim() ? 'search results' : 'filtered events'}</span></>}
+            <span>· {streamState === 'running' ? 'streaming' : streamState}</span>
+          </div>
         </div>
         <div className={`live-grid ${selected ? 'details-open' : 'details-closed'}`}>
           <div className="event-list" ref={scrollRef}>
-            {filtered.length === 0 ? <div className="empty-list">Waiting for events...</div> : (
+            {filtered.length === 0 ? <div className="empty-list">{hasActiveFilter && visibleEvents.length ? 'No matching events.' : 'Waiting for events...'}</div> : (
               <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
                 {virtualizer.getVirtualItems().map((item) => {
                   const event = filtered[item.index]

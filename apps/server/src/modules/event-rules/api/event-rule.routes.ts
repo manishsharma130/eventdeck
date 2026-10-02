@@ -8,7 +8,7 @@ const conditionSchema = z.object({
   matchType: z.enum(matchTypes),
   expectedValue: z.string().optional(),
 })
-const definitionSchema = z.object({ name: z.string(), eventValue: z.string(), rules: z.array(conditionSchema).default([]) })
+const definitionSchema = z.object({ name: z.string().default(''), eventValue: z.string(), rules: z.array(conditionSchema).default([]) })
 const idsSchema = z.object({ ids: z.array(z.string()).max(5000) })
 
 export async function eventRuleRoutes(app: FastifyInstance, dependencies: AppDependencies): Promise<void> {

@@ -9,6 +9,15 @@ describe('consolidated data management APIs', () => {
   beforeEach(async () => { ({ app, dependencies } = await createTestServer()) })
   afterEach(async () => app.close())
 
+  it('uses the event value as the optional event name', async () => {
+    const response = await app.inject({ method: 'POST', url: '/api/event-rules', payload: { eventValue: 'product_view', rules: [] } })
+    expect(response.statusCode).toBe(201)
+    expect(response.json()).toMatchObject({ name: 'product_view', eventValue: 'product_view' })
+    const missingValue = await app.inject({ method: 'POST', url: '/api/event-rules', payload: { name: 'Display name', eventValue: '   ', rules: [] } })
+    expect(missingValue.statusCode).toBe(400)
+    expect(missingValue.json().error).toMatchObject({ code: 'INVALID_EVENT_DEFINITION', message: 'Event value is required.' })
+  })
+
   it('creates unique event definitions, ordered flows, and an immutable execution snapshot', async () => {
     const homeResponse = await app.inject({ method: 'POST', url: '/api/event-rules', payload: {
       name: 'Home Open', eventValue: 'app_open', rules: [{ paramKey: 'screen', matchType: 'exact', expectedValue: 'home' }],

@@ -70,7 +70,7 @@ export class EventRuleService {
 
   private validate(input: EventDefinitionInput): ReturnType<typeof normalizeDefinition> {
     const normalized = normalizeDefinition(input)
-    if (!normalized.name || !normalized.eventValue) throw new AppError('INVALID_EVENT_DEFINITION', 'Event name and event value are required.', 400)
+    if (!normalized.eventValue) throw new AppError('INVALID_EVENT_DEFINITION', 'Event value is required.', 400)
     for (const rule of normalized.rules) {
       if (!rule.paramKey) throw new AppError('INVALID_EVENT_RULE', 'Rule parameter key is required.', 400)
       if (rule.matchType !== 'exists' && !rule.expectedValue) throw new AppError('INVALID_EVENT_RULE', `Expected value is required for ${rule.matchType} rules.`, 400)

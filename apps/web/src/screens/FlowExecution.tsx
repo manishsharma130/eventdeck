@@ -1,5 +1,5 @@
 import { useEffect, useMemo, type KeyboardEvent } from 'react'
-import { Check, Circle, CircleX, GitBranch, Info, ListTree, LoaderCircle, Pause, Play, Plus, RotateCcw, Search, Square, Trash2, X } from 'lucide-react'
+import { BarChart3, Check, Circle, CircleX, GitBranch, Info, ListTree, LoaderCircle, Pause, Play, Plus, RotateCcw, Search, Square, Trash2, X } from 'lucide-react'
 import { Button, Checkbox, IconButton, Input, Modal, PageHeader, Panel, Select } from '../components/ui'
 import { api, type Completion, type ExecutionState, type Flow, type SelectedFlow } from '../services/api'
 import type { EventDeckWebSocket } from '../services/websocket'
@@ -64,10 +64,21 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
   const [draftFlowIds, setDraftFlowIds] = useTabState<string[]>('execution', 'draftFlowIds', [])
   const [flowSelectorError, setFlowSelectorError] = useTabState('execution', 'flowSelectorError', '')
   const [executionError, setExecutionError] = useTabState('execution', 'executionError', '')
+  const [resultsOpen, setResultsOpen] = useTabState('execution', 'resultsOpen', false)
+  const [graphicalResults, setGraphicalResults] = useTabState('execution', 'graphicalResults', false)
   const selected = visibleFlows.find((flow) => flow.id === selectedId)
   const draftFlowIdSet = useMemo(() => new Set(draftFlowIds), [draftFlowIds])
   const filteredAvailableFlows = useMemo(() => availableFlows.filter((flow) => flow.name.toLowerCase().includes(flowQuery.toLowerCase())), [availableFlows, flowQuery])
   const counts = useMemo(() => selected?.events.reduce((acc, item) => ({ ...acc, [item.status]: acc[item.status] + 1 }), { passed: 0, pending: 0, failed: 0 }) ?? { passed: 0, pending: 0, failed: 0 }, [selected])
+  const completedFlows = useMemo(() => visibleFlows.filter((flow) => flow.finalStatus), [visibleFlows])
+  const resultTotals = useMemo(() => completedFlows.reduce((totals, flow) => ({
+    flows: totals.flows + 1,
+    passedFlows: totals.passedFlows + (flow.finalStatus === 'PASSED' ? 1 : 0),
+    partialFlows: totals.partialFlows + (flow.finalStatus === 'PARTIAL' ? 1 : 0),
+    failedFlows: totals.failedFlows + (flow.finalStatus === 'FAILED' ? 1 : 0),
+    passedEvents: totals.passedEvents + (flow.passedEvents ?? 0),
+    failedEvents: totals.failedEvents + (flow.failedEvents ?? 0),
+  }), { flows: 0, passedFlows: 0, partialFlows: 0, failedFlows: 0, passedEvents: 0, failedEvents: 0 }), [completedFlows])
   const mapFlows = (flows: SelectedFlow[], state?: ExecutionState, completed?: Completion): ExecutionFlow[] => {
     const runtimeByFlow = new Map(state?.flows.map((flow) => [flow.flowId, flow]) ?? [])
     const completedByFlow = new Map(completed?.flows.map((flow) => [flow.flowId, flow]) ?? [])
@@ -85,7 +96,7 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
   const refresh = async () => { try { const [saved, all, sessions, state] = await Promise.all([api.selectedFlows(), api.flows(), api.recordings(), api.execution()]); setSelectedData(saved); setAvailableFlows(all); setRecordings(sessions); const mapped = mapFlows(saved, state, state.completion ?? undefined); setVisibleFlows(mapped); setSelectedId((current) => mapped.some((flow) => flow.id === current) ? current : ''); setValidationState(state.active ? 'running' : 'stopped'); setMessage(saved.length ? '' : 'No flows selected.') } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Could not load flow execution.') } }
   useEffect(() => { void refresh() }, [])
   useEffect(() => websocket?.subscribe((event) => {
-    if (event.type === 'flow_execution.started') { setExecutionError(''); setValidationState('running'); setVisibleFlows(mapFlows(selectedData, { active: true, flows: (event.payload as { flows: ExecutionState['flows'] }).flows })) }
+    if (event.type === 'flow_execution.started') { setExecutionError(''); setResultsOpen(false); setValidationState('running'); setVisibleFlows(mapFlows(selectedData, { active: true, flows: (event.payload as { flows: ExecutionState['flows'] }).flows })) }
     else if (event.type === 'flow_execution.event_definition_passed') {
       const affected = (event.payload as { affectedFlows: Array<{ flowId: string; flowIndex: number; eventIndex: number }> }).affectedFlows
       setVisibleFlows((current) => {
@@ -102,6 +113,7 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
       })
     } else if (event.type === 'flow_execution.reset') {
       setExecutionError('')
+      setResultsOpen(false)
       setValidationState('stopped')
       setVisibleFlows(mapFlows(selectedData, { active: false, flows: (event.payload as { flows: ExecutionState['flows'] }).flows }))
     } else if (event.type === 'flow_execution.validation_error') {
@@ -123,9 +135,9 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
     } catch (cause) { setFlowSelectorError(cause instanceof Error ? cause.message : 'Could not save selected flows.') }
   }
   const removeFlow = async (flowId: string) => { if (validationState !== 'stopped') return; try { const saved = await api.replaceSelectedFlows(selectedData.filter((flow) => flow.flowId !== flowId).map((flow) => flow.flowId)); setSelectedData(saved); const mapped = mapFlows(saved); setVisibleFlows(mapped); if (selectedId === flowId) setSelectedId('') } catch (cause) { setExecutionError(cause instanceof Error ? cause.message : 'Could not remove flow.') } }
-  const start = async () => { try { setExecutionError(''); const result = await api.validate(source === 'live' ? undefined : source); if ('status' in result) { setValidationState('running'); setVisibleFlows(mapFlows(selectedData, { active: true, flows: result.flows })) } else { setValidationState('stopped'); setVisibleFlows(mapFlows(selectedData, undefined, result)) } } catch (cause) { setExecutionError(cause instanceof Error ? cause.message : 'Could not start validation.') } }
+  const start = async () => { try { setExecutionError(''); setResultsOpen(false); const result = await api.validate(source === 'live' ? undefined : source); if ('status' in result) { setValidationState('running'); setVisibleFlows(mapFlows(selectedData, { active: true, flows: result.flows })) } else { setValidationState('stopped'); setVisibleFlows(mapFlows(selectedData, undefined, result)) } } catch (cause) { setExecutionError(cause instanceof Error ? cause.message : 'Could not start validation.') } }
   const stop = async () => { try { const result = await api.stopValidation(); setValidationState('stopped'); setVisibleFlows(mapFlows(selectedData, undefined, result)) } catch (cause) { setExecutionError(cause instanceof Error ? cause.message : 'Could not stop validation.') } }
-  const reset = async () => { try { setExecutionError(''); const result = await api.resetValidation(); setValidationState('stopped'); setVisibleFlows(mapFlows(selectedData, { active: false, flows: result.flows })) } catch (cause) { setExecutionError(cause instanceof Error ? cause.message : 'Could not reset validation.') } }
+  const reset = async () => { try { setExecutionError(''); setResultsOpen(false); const result = await api.resetValidation(); setValidationState('stopped'); setVisibleFlows(mapFlows(selectedData, { active: false, flows: result.flows })) } catch (cause) { setExecutionError(cause instanceof Error ? cause.message : 'Could not reset validation.') } }
   return (
     <div className="screen execution-screen">
       <div className="execution-top-view">
@@ -152,7 +164,7 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
       </div>
       <div className="execution-top-divider" />
       <div className={`execution-grid execution-bottom-view ${selected ? 'details-open' : 'details-closed'}`}>
-        <Panel className="selected-flows"><div className="selected-flows-header"><h2>Selected Flows ({visibleFlows.length})</h2><p>View and monitor the execution status of your event flows.</p></div>{message && <div className="empty-list" role="status">{message}</div>}{visibleFlows.length ? <VirtualList className="execution-flow-list" items={visibleFlows} estimateSize={220} getKey={(flow) => flow.id} renderItem={(flow) => <ExecutionCard flow={flow} active={flow.id === selectedId} selectionLocked={validationState !== 'stopped'} onClick={() => setSelectedId(flow.id)} onDelete={() => void removeFlow(flow.id)} />} /> : <div className="flow-empty-state"><span className="flow-empty-icon"><GitBranch /></span><h3>No flows selected</h3><p>Add a saved flow to begin validation. Create flows in the <strong>Build Flow</strong> tab, then use the Plus control here to add them.</p><Button variant="primary" disabled={validationState !== 'stopped'} onClick={openFlowSelector}><Plus />Select Flows</Button></div>}</Panel>
+        <Panel className="selected-flows"><div className="selected-flows-header"><div><h2>Selected Flows ({visibleFlows.length})</h2><p>View and monitor the execution status of your event flows.</p></div><Button className="all-results-button" disabled={validationState !== 'stopped' || completedFlows.length === 0} title={validationState !== 'stopped' ? 'Results are available after validation stops' : completedFlows.length === 0 ? 'Run validation to generate results' : 'View combined validation results'} onClick={() => { setGraphicalResults(false); setResultsOpen(true) }}><BarChart3 />All Results</Button></div>{message && <div className="empty-list" role="status">{message}</div>}{visibleFlows.length ? <VirtualList className="execution-flow-list" items={visibleFlows} estimateSize={220} getKey={(flow) => flow.id} renderItem={(flow) => <ExecutionCard flow={flow} active={flow.id === selectedId} selectionLocked={validationState !== 'stopped'} onClick={() => setSelectedId(flow.id)} onDelete={() => void removeFlow(flow.id)} />} /> : <div className="flow-empty-state"><span className="flow-empty-icon"><GitBranch /></span><h3>No flows selected</h3><p>Add a saved flow to begin validation. Create flows in the <strong>Build Flow</strong> tab, then use the Plus control here to add them.</p><Button variant="primary" disabled={validationState !== 'stopped'} onClick={openFlowSelector}><Plus />Select Flows</Button></div>}</Panel>
         {selected && <Panel className="execution-details">
           <><div className="execution-title">
             <div className="execution-title-row"><div><h2>Selected Flow Details</h2><p>Real-time execution details and event status for this flow.</p></div><IconButton bare label="Close selected flow details" onClick={() => setSelectedId('')}><X size={19} /></IconButton></div>
@@ -169,6 +181,23 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
         </Panel>}
       </div>
       {executionError && <div className="app-toast error" role="alert"><strong>Flow validation error</strong><span>{executionError}</span><button aria-label="Dismiss error" onClick={() => setExecutionError('')}>×</button></div>}
+      {resultsOpen && completedFlows.length > 0 && <Modal className="validation-results-modal" title="Validation Results" onClose={() => setResultsOpen(false)} actions={<><Button onClick={() => setGraphicalResults((current) => !current)}><BarChart3 />{graphicalResults ? 'Structured View' : 'Graphical View'}</Button><Button variant="primary" onClick={() => setResultsOpen(false)}>Close</Button></>}>
+        <div className="validation-results-summary" aria-label="Combined validation summary">
+          <div><small>Flows</small><strong>{resultTotals.flows}</strong></div>
+          <div className="passed"><small>Passed</small><strong>{resultTotals.passedFlows}</strong></div>
+          <div className="partial"><small>Partial</small><strong>{resultTotals.partialFlows}</strong></div>
+          <div className="failed"><small>Failed</small><strong>{resultTotals.failedFlows}</strong></div>
+        </div>
+        <p className="validation-event-total"><strong>{resultTotals.passedEvents}</strong> passed events · <strong>{resultTotals.failedEvents}</strong> failed events</p>
+        {graphicalResults ? <div className="validation-results-chart" role="img" aria-label="Graphical validation results">
+          <section><h3>Flow outcomes</h3><div className="result-stacked-bar" aria-label={`${resultTotals.passedFlows} passed, ${resultTotals.partialFlows} partial, ${resultTotals.failedFlows} failed flows`}><i className="passed" style={{ width: `${resultTotals.flows ? resultTotals.passedFlows / resultTotals.flows * 100 : 0}%` }} /><i className="partial" style={{ width: `${resultTotals.flows ? resultTotals.partialFlows / resultTotals.flows * 100 : 0}%` }} /><i className="failed" style={{ width: `${resultTotals.flows ? resultTotals.failedFlows / resultTotals.flows * 100 : 0}%` }} /></div><div className="result-chart-legend"><span className="passed">Passed {resultTotals.passedFlows}</span><span className="partial">Partial {resultTotals.partialFlows}</span><span className="failed">Failed {resultTotals.failedFlows}</span></div></section>
+          <section className="result-flow-bars"><h3>Events by flow</h3><VirtualList className="result-flow-bars-list" items={completedFlows} estimateSize={48} getKey={(flow) => flow.id} renderItem={(flow) => { const total = (flow.passedEvents ?? 0) + (flow.failedEvents ?? 0); return <div className="result-flow-bar"><div><strong>{flow.name}</strong><small>{flow.passedEvents ?? 0} passed · {flow.failedEvents ?? 0} failed</small></div><div className="result-stacked-bar"><i className="passed" style={{ width: `${total ? (flow.passedEvents ?? 0) / total * 100 : 0}%` }} /><i className="failed" style={{ width: `${total ? (flow.failedEvents ?? 0) / total * 100 : 0}%` }} /></div></div> }} /></section>
+        </div> : <VirtualList className="validation-results-list" items={completedFlows} estimateSize={150} getKey={(flow) => flow.id} renderItem={(flow) => <article className="validation-result-flow">
+          <header><div><h3>{flow.name}</h3><small>#{flow.id}</small></div><span className={`flow-final-status ${flow.finalStatus?.toLowerCase()}`}>{flow.finalStatus}</span></header>
+          <div className="validation-result-counts"><span><Check />{flow.passedEvents ?? 0} passed</span><span><CircleX />{flow.failedEvents ?? 0} failed</span></div>
+          <div className="validation-result-events">{flow.events.map((event, index) => <span key={`${index}:${event.name}`} className={event.status}><b>{index + 1}</b>{event.name}<StatusIcon status={event.status} /></span>)}</div>
+        </article>} />}
+      </Modal>}
       {flowSelectorOpen && <Modal className="flow-selector-modal" title="Select Flows" onClose={() => setFlowSelectorOpen(false)} actions={<><Button onClick={() => setFlowSelectorOpen(false)}>Cancel</Button><Button variant="primary" onClick={() => void saveFlowSelection()}>Save</Button></>}>
         <label className="search-field flow-selector-search"><Search size={19} /><Input autoFocus value={flowQuery} onChange={(event) => setFlowQuery(event.target.value)} placeholder="Search created flows..." /></label>
         {flowSelectorError && <div className="flow-selector-error" role="alert">{flowSelectorError}</div>}

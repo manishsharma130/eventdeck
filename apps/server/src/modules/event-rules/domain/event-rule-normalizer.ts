@@ -7,9 +7,10 @@ export function normalizeDefinition(input: EventDefinitionInput): {
   eventValue: string
   rules: NormalizedRule[]
 } {
+  const eventValue = input.eventValue.trim()
   return {
-    name: input.name.trim(),
-    eventValue: input.eventValue.trim(),
+    name: input.name.trim() || eventValue,
+    eventValue,
     rules: input.rules.map((rule) => ({
       paramKey: rule.paramKey.trim(),
       matchType: rule.matchType,
