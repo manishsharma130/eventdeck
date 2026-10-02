@@ -33,3 +33,31 @@ describe('device-aware Live Stream recording', () => {
     await service.close()
   })
 })
+
+describe('recording deletion', () => {
+  it('deletes sessions and their events atomically while protecting the active recording', async () => {
+    const database = new SqliteDatabase(':memory:')
+    const repository = new SqliteRecordingRepository(database)
+    const service = new LiveStreamService(
+      { listDevices: async () => [], startAnalyticsLogcat: async () => ({ stop: async () => undefined }) },
+      repository, { broadcast: vi.fn(), sendToClient: vi.fn(), close: vi.fn() },
+      new LiveEventBus(), pino({ level: 'silent' }),
+    )
+    try {
+      await service.selectDevice('device-a')
+      const saved = await service.startRecording('Saved session')
+      service.handleMessage(JSON.stringify({ eventName: 'app_open', eventParams: {} }))
+      await service.stopRecording()
+      const active = await service.startRecording('Active session')
+      expect(() => service.deleteRecordings([saved.id, active.id])).toThrow('Stop and save')
+      expect(service.getRecording(saved.id).events).toHaveLength(1)
+      expect(service.deleteRecordings([saved.id, saved.id])).toEqual({ deleted: 1 })
+      expect(repository.findById(saved.id)).toBeNull()
+      expect(database.access((db) => db.prepare('SELECT COUNT(*) AS count FROM recorded_session_events').get())).toEqual({ count: 0 })
+      expect(service.getState().recordingSessionId).toBe(active.id)
+      await service.stopRecording()
+      expect(service.deleteRecordings([active.id])).toEqual({ deleted: 1 })
+      expect(service.listRecordings()).toEqual([])
+    } finally { await service.close(); database.close() }
+  })
+})

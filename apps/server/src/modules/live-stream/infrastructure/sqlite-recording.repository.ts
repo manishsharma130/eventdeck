@@ -36,6 +36,12 @@ export class SqliteRecordingRepository implements RecordingRepository {
     })
   }
   list(): RecordedSession[] { return this.database.access((db) => (db.prepare('SELECT * FROM recorded_sessions ORDER BY started_at DESC').all() as SessionRow[]).map(this.mapSession)) }
+  deleteMany(ids: string[]): number {
+    return this.database.access((db) => db.transaction(() => {
+      const statement = db.prepare('DELETE FROM recorded_sessions WHERE id = ?')
+      return ids.reduce((count, id) => count + statement.run(id).changes, 0)
+    })())
+  }
   nextSequence(sessionId: string): number {
     return this.database.access((db) => (db.prepare('SELECT COALESCE(MAX(sequence), -1) + 1 AS sequence FROM recorded_session_events WHERE session_id = ?').get(sessionId) as { sequence: number }).sequence)
   }

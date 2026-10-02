@@ -99,6 +99,13 @@ export class LiveStreamService {
     return session
   }
 
+  deleteRecordings(ids: string[]): { deleted: number } {
+    if (this.state.recordingSessionId && ids.includes(this.state.recordingSessionId)) {
+      throw new AppError('RECORDING_ACTIVE', 'Stop and save the active recording before deleting it.', 409)
+    }
+    return { deleted: this.recordings.deleteMany([...new Set(ids)]) }
+  }
+
   handleMessage(message: string): void {
     let event: LiveEvent
     try {

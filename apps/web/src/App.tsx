@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AppShell, type TabId } from './components/ui'
 import { EventDeckWebSocket, type ConnectionStatus } from './services/websocket'
 import { LiveStream } from './screens/LiveStream'
+import { RecordSessions } from './screens/RecordSessions'
 import { EventRules } from './screens/EventRules'
 import { BuildFlow } from './screens/BuildFlow'
 import { FlowExecution } from './screens/FlowExecution'
@@ -11,12 +12,12 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import { useLiveStreamStore } from './state/live-stream-store'
 
 type ViewOverride = TabId | 'loading' | 'disconnected' | null
-const tabPaths: Record<TabId, string> = { live: '/live-stream', rules: '/event-rules', build: '/build-flow', execution: '/flow-execution' }
+const tabPaths: Record<TabId, string> = { live: '/live-stream', rules: '/event-rules', build: '/build-flow', execution: '/flow-execution', recordings: '/record-sessions' }
 const pathTabs = Object.fromEntries(Object.entries(tabPaths).map(([tab, path]) => [path, tab])) as Record<string, TabId>
 
 function getViewOverride(): ViewOverride {
   const value = new URLSearchParams(window.location.search).get('view')
-  return ['live', 'rules', 'build', 'execution', 'loading', 'disconnected'].includes(value ?? '') ? value as ViewOverride : null
+  return ['live', 'rules', 'build', 'execution', 'recordings', 'loading', 'disconnected'].includes(value ?? '') ? value as ViewOverride : null
 }
 
 export function App() {
@@ -24,7 +25,7 @@ export function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const routeTab = pathTabs[location.pathname]
-  const initialTab = override && ['live', 'rules', 'build', 'execution'].includes(override) ? override as TabId : routeTab ?? 'live'
+  const initialTab = override && ['live', 'rules', 'build', 'execution', 'recordings'].includes(override) ? override as TabId : routeTab ?? 'live'
   const [connection, setConnection] = useState<ConnectionStatus>(override && !['loading', 'disconnected'].includes(override) ? 'connected' : 'connecting')
   const [client, setClient] = useState<EventDeckWebSocket | null>(null)
 
@@ -58,10 +59,11 @@ export function App() {
 
   return (
     <AppShell active={tab} onNavigate={navigateToTab}>
-      {override && ['live', 'rules', 'build', 'execution'].includes(override) ? (
-        override === 'live' ? <LiveStream /> : override === 'rules' ? <EventRules /> : override === 'build' ? <BuildFlow /> : <FlowExecution websocket={client} />
+      {override && ['live', 'rules', 'build', 'execution', 'recordings'].includes(override) ? (
+        override === 'recordings' ? <RecordSessions /> : override === 'live' ? <LiveStream /> : override === 'rules' ? <EventRules /> : override === 'build' ? <BuildFlow /> : <FlowExecution websocket={client} />
       ) : <Routes>
         <Route path="/live-stream" element={<LiveStream />} />
+        <Route path="/record-sessions" element={<RecordSessions />} />
         <Route path="/event-rules" element={<EventRules />} />
         <Route path="/build-flow" element={<BuildFlow />} />
         <Route path="/flow-execution" element={<FlowExecution websocket={client} />} />

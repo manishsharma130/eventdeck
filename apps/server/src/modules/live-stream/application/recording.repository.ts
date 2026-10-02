@@ -7,6 +7,7 @@ export interface RecordingRepository {
   complete(sessionId: string, name: string, endedAt: number): RecordedSession
   findById(id: string): (RecordedSession & { events: RecordedEvent[] }) | null
   list(): RecordedSession[]
+  deleteMany(ids: string[]): number
   nextSequence(sessionId: string): number
 }
 

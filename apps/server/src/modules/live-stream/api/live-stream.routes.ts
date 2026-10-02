@@ -14,6 +14,8 @@ export async function liveStreamRoutes(app: FastifyInstance, dependencies: AppDe
   app.post('/api/live-stream/stop', async () => service.stop())
   app.post('/api/live-stream/recording/start', async (request, reply) => reply.status(201).send(await service.startRecording(z.object({ name: z.string() }).parse(request.body).name)))
   app.post('/api/live-stream/recording/stop', async (request) => service.stopRecording(z.object({ name: z.string().optional() }).parse(request.body ?? {}).name))
+  app.delete('/api/recorded-sessions', async (request) => service.deleteRecordings(z.object({ ids: z.array(z.string().min(1)).min(1) }).parse(request.body).ids))
+  app.delete('/api/recorded-sessions/:id', async (request) => service.deleteRecordings([idParams.parse(request.params).id]))
   app.get('/api/recorded-sessions', async () => service.listRecordings())
   app.get('/api/recorded-sessions/:id', async (request) => service.getRecording(idParams.parse(request.params).id))
 }
