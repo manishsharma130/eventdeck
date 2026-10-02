@@ -30,4 +30,29 @@ describe('flow execution failures', () => {
     })
     expect(messages.at(-1)).toMatchObject({ type: 'flow_execution.validation_completed', payload: { reason: 'EXECUTION_ERROR' } })
   })
+
+  it('resets completed event statuses to pending while idle', () => {
+    const messages: Array<{ type: string; payload: unknown }> = []
+    const websocket: WebSocketGateway = {
+      broadcast: (type, payload) => { messages.push({ type, payload }) },
+      sendToClient: () => undefined,
+      close: () => undefined,
+    }
+    const selection = { getSelected: () => [{
+      flowId: 'flow-1', name: 'Flow', position: 0,
+      events: [{ flowEventId: 'flow-event-1', eventDefinitionId: 'definition-1', eventName: 'open', eventDefinitionName: 'Open', position: 0, rules: [] }],
+    }] } as unknown as FlowSelectionService
+    const service = new FlowExecutionService(selection, websocket, new LiveEventBus())
+    service.start()
+    expect(() => service.reset()).toThrow('Stop validation before resetting its status.')
+    service.handleEvent({ eventName: 'open', eventParams: {} })
+    service.stop()
+
+    const reset = service.reset()
+
+    expect(reset).toMatchObject({ status: 'reset', flows: [{ events: [{ status: 'PENDING' }] }] })
+    expect(service.getState()).toMatchObject({ active: false, flows: [{ events: [{ status: 'PENDING' }] }] })
+    expect(service.getLastCompletion()).toBeNull()
+    expect(messages.at(-1)).toMatchObject({ type: 'flow_execution.reset', payload: { status: 'reset' } })
+  })
 })

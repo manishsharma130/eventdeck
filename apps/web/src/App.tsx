@@ -10,6 +10,7 @@ import { DisconnectedScreen, LoadingScreen } from './screens/Startup'
 import { api } from './services/api'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useLiveStreamStore } from './state/live-stream-store'
+import { ScrollRestorationBoundary } from './components/ScrollRestorationBoundary'
 
 type ViewOverride = TabId | 'loading' | 'disconnected' | null
 const tabPaths: Record<TabId, string> = { live: '/live-stream', rules: '/event-rules', build: '/build-flow', execution: '/flow-execution', recordings: '/record-sessions' }
@@ -59,7 +60,7 @@ export function App() {
 
   return (
     <AppShell active={tab} onNavigate={navigateToTab}>
-      {override && ['live', 'rules', 'build', 'execution', 'recordings'].includes(override) ? (
+      <ScrollRestorationBoundary tab={tab}>{override && ['live', 'rules', 'build', 'execution', 'recordings'].includes(override) ? (
         override === 'recordings' ? <RecordSessions /> : override === 'live' ? <LiveStream /> : override === 'rules' ? <EventRules /> : override === 'build' ? <BuildFlow /> : <FlowExecution websocket={client} />
       ) : <Routes>
         <Route path="/live-stream" element={<LiveStream />} />
@@ -68,7 +69,7 @@ export function App() {
         <Route path="/build-flow" element={<BuildFlow />} />
         <Route path="/flow-execution" element={<FlowExecution websocket={client} />} />
         <Route path="*" element={<Navigate to="/live-stream" replace />} />
-      </Routes>}
+      </Routes>}</ScrollRestorationBoundary>
     </AppShell>
   )
 }

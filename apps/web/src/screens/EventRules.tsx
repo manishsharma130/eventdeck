@@ -3,11 +3,13 @@ import { FileText, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react'
 import { Button, Checkbox, IconButton, Input, Modal, PageHeader, Panel, Select } from '../components/ui'
 import { api, ApiError, type EventDefinition, type MatchType } from '../services/api'
 import { useTabState } from '../state/tab-ui-store'
+import { VirtualList } from '../components/VirtualList'
 
 type Rule = { parameter: string; condition: MatchType; value: string }
 const emptyRule = (): Rule => ({ parameter: '', condition: 'exact', value: '' })
 
 export function EventRules() {
+  const [deleteError, setDeleteError] = useTabState('rules', 'deleteError', '')
   const [definitions, setDefinitions] = useTabState<EventDefinition[]>('rules', 'definitions', [])
   const [selectedId, setSelectedId] = useTabState<string | null>('rules', 'selectedId', null)
   const [checked, setChecked] = useTabState<string[]>('rules', 'checked', [])
@@ -20,11 +22,14 @@ export function EventRules() {
   const [message, setMessage] = useTabState('rules', 'message', 'Loading event rules…')
   const [duplicateMessage, setDuplicateMessage] = useTabState('rules', 'duplicateMessage', '')
   const [pendingDelete, setPendingDelete] = useTabState<{ ids: string[]; flowCount: number } | null>('rules', 'pendingDelete', null)
+  const [validationIssues, setValidationIssues] = useTabState<string[]>('rules', 'validationIssues', [])
 
   const list = useMemo(() => definitions.filter((item) =>
     `${item.name} ${item.eventValue}`.toLowerCase().includes(query.toLowerCase()),
   ), [definitions, query])
   const checkedSet = useMemo(() => new Set(checked), [checked])
+  const definitionValidationIssues = validationIssues.filter((issue) => !issue.startsWith('Rule '))
+  const ruleValidationIssues = validationIssues.filter((issue) => issue.startsWith('Rule '))
   const sortDefinitions = (items: EventDefinition[]) => [...items].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }))
 
   const resetForm = () => {
@@ -53,6 +58,26 @@ export function EventRules() {
   useEffect(() => { void refresh() }, [])
 
   const save = async () => {
+    const incompleteFields = [
+      ...(!eventName.trim() ? ['Event Name'] : []),
+      ...(!eventValue.trim() ? ['Event Value'] : []),
+      ...rules.flatMap((rule, index) => {
+        const parameter = rule.parameter.trim()
+        const ruleLabel = parameter ? `Rule ${index + 1} — Event Parameter "${parameter}"` : `Rule ${index + 1}`
+        const missing = [
+          ...(!parameter ? ['Event Parameter name'] : []),
+          ...(!rule.condition ? ['Condition'] : []),
+          ...(rule.condition !== 'exists' && !rule.value.trim() ? ['Value'] : []),
+        ]
+        if (!missing.length) return []
+        const fields = missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}`
+        return [`${ruleLabel}: ${fields}`]
+      }),
+    ]
+    if (incompleteFields.length) {
+      setValidationIssues(incompleteFields)
+      return
+    }
     const editing = Boolean(selectedId)
     const input = {
       name: eventName.trim(),
@@ -80,7 +105,7 @@ export function EventRules() {
       setChecked([])
       if (selectedId && removed.has(selectedId)) closeForm()
       setMessage('Event rule deleted.')
-    } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Could not delete event rule.') }
+    } catch (cause) { setDeleteError(cause instanceof Error ? cause.message : 'Could not delete event rule.') }
   }
   const requestRemove = async (ids: string[]) => {
     try {
@@ -101,16 +126,14 @@ export function EventRules() {
             </form>
             <div className="toolbar rules-toolbar-actions"><Button variant="primary" onClick={addEvent}><Plus size={20} />Add Event</Button><Button disabled={!checked.length} onClick={() => void requestRemove(checked)}><Trash2 size={18} />Delete</Button><span className="toolbar-separator" /><Button disabled={!definitions.length} onClick={() => void requestRemove(definitions.map((item) => item.id))}><Trash2 size={18} />Delete All</Button></div>
           </div>
-          <div className="definition-list">
-            {list.map((definition, index) => <div key={definition.id} role="button" tabIndex={0} className={`definition-row ${selectedId === definition.id ? 'selected' : ''}`} onClick={() => choose(definition)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') choose(definition) }}>
+          {list.length > 0 && <VirtualList className="definition-list" items={list} estimateSize={59} getKey={(definition) => definition.id} renderItem={(definition, index) => <div role="button" tabIndex={0} className={`definition-row ${selectedId === definition.id ? 'selected' : ''}`} onClick={() => choose(definition)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') choose(definition) }}>
               <span onClick={(event) => event.stopPropagation()}><Checkbox label={`Select ${definition.name}`} checked={checkedSet.has(definition.id)} onChange={() => setChecked((value) => value.includes(definition.id) ? value.filter((item) => item !== definition.id) : [...value, definition.id])} /></span>
               <span className="sequence">{String(index + 1).padStart(3, '0')}</span>
               <span className="definition-name"><strong>{definition.name}</strong><small>Value: {definition.eventValue}</small></span>
               <span className={`rule-count ${definition.rules.length ? 'has-rules' : ''}`}><FileText size={20} />{definition.rules.length ? `${definition.rules.length} ${definition.rules.length === 1 ? 'rule' : 'rules'}` : 'No rules'}</span>
               <MoreVertical size={18} />
-            </div>)}
-            {message && <div className="empty-list" role="status">{message}</div>}
-          </div>
+            </div>} />}
+          {message && <div className="empty-list" role="status">{message}</div>}
         </Panel>
         {formOpen && <Panel className="form-panel">
           <div className="panel-title"><div><h2>Event Information</h2><p>Configure the event details and define matching rules.</p></div><IconButton bare label="Close event information" onClick={closeForm}><X size={19} /></IconButton></div>
@@ -118,18 +141,29 @@ export function EventRules() {
           <label className="field-label">Event Value <span>(Required)</span><Input className="focused" value={eventValue} onChange={(event) => setEventValue(event.target.value)} placeholder="Enter the live event name..." /></label>
           <div className="rules-heading"><div><h3>Event Rules <span>(Optional)</span></h3><p>Define rules to match this event based on parameters, values, or patterns.</p></div><Button variant="primary" onClick={() => setRules((current) => [...current, emptyRule()])}><Plus size={19} />Add Rule</Button></div>
           <div className="rules-table"><div className="rule-table-head"><span>#</span><span>Event Parameter</span><span>Condition</span><span>Value</span><span /></div>
-            {rules.map((rule, index) => <div className="rule-row" key={index}>
+            <VirtualList className="rule-list" items={rules} estimateSize={57} getKey={(_, index) => String(index)} renderItem={(rule, index) => <div className="rule-row">
               <span>{index + 1}</span><Input value={rule.parameter} onChange={(event) => updateRule(index, 'parameter', event.target.value)} placeholder="e.g. screen" />
               <Select value={rule.condition} onChange={(event) => updateRule(index, 'condition', event.target.value)}><option value="exact">Exact</option><option value="contains">Contains</option><option value="exists">Exists</option><option value="regex">Regex</option></Select>
               <Input value={rule.value} disabled={rule.condition === 'exists'} onChange={(event) => updateRule(index, 'value', event.target.value)} placeholder={rule.condition === 'exists' ? 'Not required' : 'Expected value'} />
               <button aria-label="Delete rule" onClick={() => setRules((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={18} /></button>
-            </div>)}
+            </div>} />
           </div>
-          <div className="form-actions"><Button onClick={resetForm}>Clear</Button><Button variant="primary" disabled={!eventName.trim() || !eventValue.trim()} onClick={() => void save()}>{selectedId ? 'Update' : 'Save'}</Button></div>
+          <div className="form-actions"><Button onClick={resetForm}>Clear</Button><Button variant="primary" onClick={() => void save()}>{selectedId ? 'Update' : 'Save'}</Button></div>
         </Panel>}
       </div>
+      {validationIssues.length > 0 && <Modal title="Complete the event definition" onClose={() => setValidationIssues([])} actions={<Button variant="primary" onClick={() => setValidationIssues([])}>OK</Button>}>
+        <p>Please complete the following {validationIssues.length === 1 ? 'field' : 'fields'} before saving:</p>
+        {definitionValidationIssues.length > 0 && <ul className="validation-issue-list">{definitionValidationIssues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
+        {ruleValidationIssues.length > 0 && <section className="validation-rule-section" aria-label="Incomplete rule fields">
+          <strong>Event Rule fields</strong>
+          <div className="validation-rule-scroll" tabIndex={0}>
+            <ul className="validation-issue-list">{ruleValidationIssues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+          </div>
+        </section>}
+      </Modal>}
+      {deleteError && <Modal title="Cannot delete event" onClose={() => setDeleteError('')} actions={<Button onClick={() => setDeleteError('')}>OK</Button>}><p role="alert">{deleteError}</p></Modal>}
       {duplicateMessage && <Modal title="Event rule already exists" onClose={() => setDuplicateMessage('')} actions={<Button variant="primary" onClick={() => setDuplicateMessage('')}>OK</Button>}><p>{duplicateMessage}</p></Modal>}
-      {pendingDelete && <Modal title="Delete event definition?" onClose={() => setPendingDelete(null)} actions={<><Button onClick={() => setPendingDelete(null)}>Cancel</Button><Button variant="danger" onClick={() => { const ids = pendingDelete.ids; setPendingDelete(null); void performRemove(ids) }}>Delete</Button></>}><p>{pendingDelete.ids.length === 1 ? `This event is currently used in ${pendingDelete.flowCount} ${pendingDelete.flowCount === 1 ? 'flow' : 'flows'}.` : `The selected events have ${pendingDelete.flowCount} flow references.`} Deleting {pendingDelete.ids.length === 1 ? 'it' : 'them'} will remove {pendingDelete.ids.length === 1 ? 'it' : 'them'} from those flows as well. The flows themselves will remain.</p></Modal>}
+      {pendingDelete && <Modal title="Delete event definition?" onClose={() => setPendingDelete(null)} actions={<><Button onClick={() => setPendingDelete(null)}>Cancel</Button><Button variant="danger" onClick={() => { const ids = pendingDelete.ids; setPendingDelete(null); void performRemove(ids) }}>Delete</Button></>}><p>{pendingDelete.ids.length === 1 ? `This event is currently used in ${pendingDelete.flowCount} ${pendingDelete.flowCount === 1 ? 'flow' : 'flows'}.` : `The selected events have ${pendingDelete.flowCount} flow references.`} Deleting {pendingDelete.ids.length === 1 ? 'it' : 'them'} will remove {pendingDelete.ids.length === 1 ? 'it' : 'them'} from those flows as well. Flows left with no events will also be deleted and removed from Selected Flows.</p></Modal>}
     </div>
   )
 }

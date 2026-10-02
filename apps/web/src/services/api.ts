@@ -12,7 +12,7 @@ export type RuntimeState = { selectedDeviceId: string | null; streamState: Strea
 export type LiveEvent = { id?: string; eventName: string; eventTag?: string; timestamp?: string; eventParams: Record<string, unknown> }
 export type RecordedSession = { id: string; name: string; deviceId: string; startedAt: number; endedAt: number | null; status: 'RECORDING' | 'COMPLETED'; totalEvents: number }
 export type SelectedFlow = { flowId: string; name: string; position: number; events: Array<{ flowEventId: string; eventDefinitionId: string; eventName: string; eventDefinitionName: string; position: number; rules: EventRule[]; status?: 'PENDING' | 'PASSED' | 'FAILED' }> }
-export type ExecutionState = { active: boolean; flows: Array<SelectedFlow & { flowIndex: number }> }
+export type ExecutionState = { active: boolean; flows: Array<SelectedFlow & { flowIndex: number }>; completion?: Completion | null }
 export type Completion = { reason: string; flows: Array<{ flowId: string; flowIndex: number; name: string; totalEvents: number; passedEvents: number; failedEvents: number; status: 'PASSED' | 'PARTIAL' | 'FAILED'; events: Array<{ flowEventId: string; eventDefinitionId: string; eventIndex: number; status: 'PASSED' | 'FAILED' }> }> }
 
 export class ApiError extends Error {
@@ -66,4 +66,5 @@ export const api = {
   execution: () => request<ExecutionState>('/api/flow-execution/status'),
   validate: (recordedSessionId?: string) => request<{ status: 'started'; flows: ExecutionState['flows'] } | Completion>('/api/flow-execution/validate', body({ recordedSessionId })),
   stopValidation: () => request<Completion>('/api/flow-execution/stop', body({ reason: 'USER_STOPPED' })),
+  resetValidation: () => request<{ status: 'reset'; flows: ExecutionState['flows'] }>('/api/flow-execution/reset', body({})),
 }

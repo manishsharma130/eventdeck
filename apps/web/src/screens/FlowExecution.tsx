@@ -1,10 +1,11 @@
 import { useEffect, useMemo, type KeyboardEvent } from 'react'
-import { Check, Circle, CircleX, GitBranch, Info, ListTree, LoaderCircle, Pause, Play, Plus, Search, Square, Trash2, X } from 'lucide-react'
+import { Check, Circle, CircleX, GitBranch, Info, ListTree, LoaderCircle, Pause, Play, Plus, RotateCcw, Search, Square, Trash2, X } from 'lucide-react'
 import { Button, Checkbox, IconButton, Input, Modal, PageHeader, Panel, Select } from '../components/ui'
 import { api, type Completion, type ExecutionState, type Flow, type SelectedFlow } from '../services/api'
 import type { EventDeckWebSocket } from '../services/websocket'
 import { useLiveStreamStore } from '../state/live-stream-store'
 import { useTabState } from '../state/tab-ui-store'
+import { VirtualList } from '../components/VirtualList'
 
 type ExecutionStatus = 'passed' | 'pending' | 'failed'
 type FinalFlowStatus = 'PASSED' | 'PARTIAL' | 'FAILED'
@@ -81,7 +82,7 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
       }
     })
   }
-  const refresh = async () => { try { const [saved, all, sessions, state] = await Promise.all([api.selectedFlows(), api.flows(), api.recordings(), api.execution()]); setSelectedData(saved); setAvailableFlows(all); setRecordings(sessions); const mapped = mapFlows(saved, state); setVisibleFlows(mapped); setSelectedId((current) => mapped.some((flow) => flow.id === current) ? current : ''); setValidationState(state.active ? 'running' : 'stopped'); setMessage(saved.length ? '' : 'No flows selected.') } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Could not load flow execution.') } }
+  const refresh = async () => { try { const [saved, all, sessions, state] = await Promise.all([api.selectedFlows(), api.flows(), api.recordings(), api.execution()]); setSelectedData(saved); setAvailableFlows(all); setRecordings(sessions); const mapped = mapFlows(saved, state, state.completion ?? undefined); setVisibleFlows(mapped); setSelectedId((current) => mapped.some((flow) => flow.id === current) ? current : ''); setValidationState(state.active ? 'running' : 'stopped'); setMessage(saved.length ? '' : 'No flows selected.') } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Could not load flow execution.') } }
   useEffect(() => { void refresh() }, [])
   useEffect(() => websocket?.subscribe((event) => {
     if (event.type === 'flow_execution.started') { setExecutionError(''); setValidationState('running'); setVisibleFlows(mapFlows(selectedData, { active: true, flows: (event.payload as { flows: ExecutionState['flows'] }).flows })) }
@@ -99,6 +100,10 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
         }
         return next
       })
+    } else if (event.type === 'flow_execution.reset') {
+      setExecutionError('')
+      setValidationState('stopped')
+      setVisibleFlows(mapFlows(selectedData, { active: false, flows: (event.payload as { flows: ExecutionState['flows'] }).flows }))
     } else if (event.type === 'flow_execution.validation_error') {
       const payload = event.payload as { message?: string; eventDefinitionId?: string }
       setExecutionError(`${payload.message ?? 'Flow validation failed.'}${payload.eventDefinitionId ? ` Event definition: ${payload.eventDefinitionId}.` : ''}`)
@@ -120,6 +125,7 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
   const removeFlow = async (flowId: string) => { if (validationState !== 'stopped') return; try { const saved = await api.replaceSelectedFlows(selectedData.filter((flow) => flow.flowId !== flowId).map((flow) => flow.flowId)); setSelectedData(saved); const mapped = mapFlows(saved); setVisibleFlows(mapped); if (selectedId === flowId) setSelectedId('') } catch (cause) { setExecutionError(cause instanceof Error ? cause.message : 'Could not remove flow.') } }
   const start = async () => { try { setExecutionError(''); const result = await api.validate(source === 'live' ? undefined : source); if ('status' in result) { setValidationState('running'); setVisibleFlows(mapFlows(selectedData, { active: true, flows: result.flows })) } else { setValidationState('stopped'); setVisibleFlows(mapFlows(selectedData, undefined, result)) } } catch (cause) { setExecutionError(cause instanceof Error ? cause.message : 'Could not start validation.') } }
   const stop = async () => { try { const result = await api.stopValidation(); setValidationState('stopped'); setVisibleFlows(mapFlows(selectedData, undefined, result)) } catch (cause) { setExecutionError(cause instanceof Error ? cause.message : 'Could not stop validation.') } }
+  const reset = async () => { try { setExecutionError(''); const result = await api.resetValidation(); setValidationState('stopped'); setVisibleFlows(mapFlows(selectedData, { active: false, flows: result.flows })) } catch (cause) { setExecutionError(cause instanceof Error ? cause.message : 'Could not reset validation.') } }
   return (
     <div className="screen execution-screen">
       <div className="execution-top-view">
@@ -138,6 +144,7 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
               <Play fill="currentColor" />
             </button>
             <button className="flow-control-item" aria-label="Stop validation" data-tooltip="Stop the current validation" disabled={validationState === 'stopped'} onClick={() => void stop()}><Square fill="currentColor" /></button>
+            <button className="flow-control-item" aria-label="Reset validation status" data-tooltip={validationState === 'stopped' ? 'Reset every event to Pending' : 'Stop validation before resetting'} disabled={validationState !== 'stopped' || !visibleFlows.length} onClick={() => void reset()}><RotateCcw /></button>
             <i className="flow-control-divider" />
             <label className="execution-source"><strong>Source</strong><Select disabled={validationState !== 'stopped'} value={source} onChange={(event) => setSource(event.target.value)}><option value="live">Live Stream · {liveStreamState}</option>{recordings.filter((item) => item.status === 'COMPLETED').map((item) => <option key={item.id} value={item.id}>Recorded · {item.name}</option>)}</Select></label>
           </div>
@@ -145,7 +152,7 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
       </div>
       <div className="execution-top-divider" />
       <div className={`execution-grid execution-bottom-view ${selected ? 'details-open' : 'details-closed'}`}>
-        <Panel className="selected-flows"><div className="selected-flows-header"><h2>Selected Flows ({visibleFlows.length})</h2><p>View and monitor the execution status of your event flows.</p></div>{message && <div className="empty-list" role="status">{message}</div>}{visibleFlows.length ? visibleFlows.map((flow) => <ExecutionCard key={flow.id} flow={flow} active={flow.id === selectedId} selectionLocked={validationState !== 'stopped'} onClick={() => setSelectedId(flow.id)} onDelete={() => void removeFlow(flow.id)} />) : <div className="flow-empty-state"><span className="flow-empty-icon"><GitBranch /></span><h3>No flows selected</h3><p>Add a saved flow to begin validation. Create flows in the <strong>Build Flow</strong> tab, then use the Plus control here to add them.</p><Button variant="primary" disabled={validationState !== 'stopped'} onClick={openFlowSelector}><Plus />Select Flows</Button></div>}</Panel>
+        <Panel className="selected-flows"><div className="selected-flows-header"><h2>Selected Flows ({visibleFlows.length})</h2><p>View and monitor the execution status of your event flows.</p></div>{message && <div className="empty-list" role="status">{message}</div>}{visibleFlows.length ? <VirtualList className="execution-flow-list" items={visibleFlows} estimateSize={220} getKey={(flow) => flow.id} renderItem={(flow) => <ExecutionCard flow={flow} active={flow.id === selectedId} selectionLocked={validationState !== 'stopped'} onClick={() => setSelectedId(flow.id)} onDelete={() => void removeFlow(flow.id)} />} /> : <div className="flow-empty-state"><span className="flow-empty-icon"><GitBranch /></span><h3>No flows selected</h3><p>Add a saved flow to begin validation. Create flows in the <strong>Build Flow</strong> tab, then use the Plus control here to add them.</p><Button variant="primary" disabled={validationState !== 'stopped'} onClick={openFlowSelector}><Plus />Select Flows</Button></div>}</Panel>
         {selected && <Panel className="execution-details">
           <><div className="execution-title">
             <div className="execution-title-row"><div><h2>Selected Flow Details</h2><p>Real-time execution details and event status for this flow.</p></div><IconButton bare label="Close selected flow details" onClick={() => setSelectedId('')}><X size={19} /></IconButton></div>
@@ -157,7 +164,7 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
           </div>
           <div className="execution-events-section">
             <h3 className="events-title">Events in this Flow ({selected.events.length})</h3>
-            <div className="execution-table"><div className="execution-table-head"><span>#</span><span>Event Name / Alias</span><span>Status</span></div><div className="execution-table-body">{selected.events.map((event, index) => <div className="execution-table-row" key={event.name}><span>{String(index + 1).padStart(2, '0')}</span><strong>{event.name}</strong><span className={`status-badge ${event.status}`} aria-label={statusText[event.status]} title={statusText[event.status]}><StatusIcon status={event.status} /></span></div>)}</div></div>
+            <div className="execution-table"><div className="execution-table-head"><span>#</span><span>Event Name / Alias</span><span>Status</span></div><VirtualList className="execution-table-body" items={selected.events} estimateSize={46} getKey={(event, index) => `${index}:${event.name}`} renderItem={(event, index) => <div className="execution-table-row"><span>{String(index + 1).padStart(2, '0')}</span><strong>{event.name}</strong><span className={`status-badge ${event.status}`} aria-label={statusText[event.status]} title={statusText[event.status]}><StatusIcon status={event.status} /></span></div>} /></div>
           </div></>
         </Panel>}
       </div>
@@ -165,17 +172,14 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
       {flowSelectorOpen && <Modal className="flow-selector-modal" title="Select Flows" onClose={() => setFlowSelectorOpen(false)} actions={<><Button onClick={() => setFlowSelectorOpen(false)}>Cancel</Button><Button variant="primary" onClick={() => void saveFlowSelection()}>Save</Button></>}>
         <label className="search-field flow-selector-search"><Search size={19} /><Input autoFocus value={flowQuery} onChange={(event) => setFlowQuery(event.target.value)} placeholder="Search created flows..." /></label>
         {flowSelectorError && <div className="flow-selector-error" role="alert">{flowSelectorError}</div>}
-        <div className="flow-selector-list">
-          {filteredAvailableFlows.map((flow) => {
+        {filteredAvailableFlows.length > 0 ? <VirtualList className="flow-selector-list" items={filteredAvailableFlows} estimateSize={70} getKey={(flow) => flow.id} renderItem={(flow) => {
             const checked = draftFlowIdSet.has(flow.id)
-            return <div key={flow.id} className={`flow-selector-row ${checked ? 'selected' : ''}`} role="button" tabIndex={0} onClick={() => toggleDraftFlow(flow.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleDraftFlow(flow.id) } }}>
+            return <div className={`flow-selector-row ${checked ? 'selected' : ''}`} role="button" tabIndex={0} onClick={() => toggleDraftFlow(flow.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleDraftFlow(flow.id) } }}>
               <span onClick={(event) => event.stopPropagation()}><Checkbox label={`Select ${flow.name}`} checked={checked} onChange={() => toggleDraftFlow(flow.id)} /></span>
               <strong>{flow.name}</strong>
               <span className="event-pill">{flow.events.length} events</span>
             </div>
-          })}
-          {!filteredAvailableFlows.length && <div className="flow-selector-empty">No created flows found.</div>}
-        </div>
+          }} /> : <div className="flow-selector-list"><div className="flow-selector-empty">No created flows found.</div></div>}
       </Modal>}
     </div>
   )

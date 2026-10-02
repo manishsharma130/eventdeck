@@ -1,22 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { ArrowLeft, FileText, Search, Trash2 } from 'lucide-react'
 import { Button, CopyButton, EmptyState, IconButton, Input, Modal, PageHeader, TagBadge } from '../components/ui'
 import { api, type RecordedSession } from '../services/api'
 import { useLiveStreamStore } from '../state/live-stream-store'
+import { useTabState } from '../state/tab-ui-store'
+import { VirtualList } from '../components/VirtualList'
+import { VirtualGrid } from '../components/VirtualGrid'
 
 type SessionDetails = Awaited<ReturnType<typeof api.recording>>
 
 export function RecordSessions() {
-  const [sessions, setSessions] = useState<RecordedSession[]>([])
-  const [query, setQuery] = useState('')
-  const [checked, setChecked] = useState<string[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [details, setDetails] = useState<SessionDetails | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<string[] | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [revision, setRevision] = useState(0)
+  const [sessions, setSessions] = useTabState<RecordedSession[]>('recordings', 'sessions', [])
+  const [query, setQuery] = useTabState('recordings', 'query', '')
+  const [checked, setChecked] = useTabState<string[]>('recordings', 'checked', [])
+  const [selectedId, setSelectedId] = useTabState<string | null>('recordings', 'selectedId', null)
+  const [details, setDetails] = useTabState<SessionDetails | null>('recordings', 'details', null)
+  const [pendingDelete, setPendingDelete] = useTabState<string[] | null>('recordings', 'pendingDelete', null)
+  const [busy, setBusy] = useTabState('recordings', 'busy', false)
+  const [loading, setLoading] = useTabState('recordings', 'loading', true)
+  const [error, setError] = useTabState('recordings', 'error', '')
+  const [revision, setRevision] = useTabState('recordings', 'revision', 0)
+  const [expandedEventIds, setExpandedEventIds] = useTabState<string[]>('recordings', 'expandedEventIds', [])
   const recordingId = useLiveStreamStore((state) => state.runtime.recordingSessionId)
 
   useEffect(() => {
@@ -64,13 +68,13 @@ export function RecordSessions() {
     {error && !pendingDelete && <div className="empty-list" role="alert">{error}<Button onClick={() => setRevision((value) => value + 1)}>Retry</Button></div>}
     {selectedId ? <>
       <div className="toolbar"><Button onClick={() => { setSelectedId(null); setError('') }}><ArrowLeft size={18} />All sessions</Button><Button onClick={() => setRevision((value) => value + 1)}>Refresh</Button></div>
-      {details ? <section className="panel recording-detail" tabIndex={0} aria-label="Recorded session events">
+      {details ? <section className="panel recording-detail recording-detail-layout" tabIndex={0} aria-label="Recorded session events">
         <div className="panel-title"><div><h2>{details.name}</h2><p>{details.events.length} events · {details.deviceId} · {new Date(details.startedAt).toLocaleString()}</p></div><TagBadge tone={details.status === 'RECORDING' ? 'green' : 'muted'}>{details.status === 'RECORDING' ? 'Recording' : 'Saved'}</TagBadge></div>
-        {details.events.length ? details.events.map((record) => <details className="recorded-event" key={record.id}>
+        {details.events.length ? <VirtualList className="recorded-event-list" items={details.events} estimateSize={62} getKey={(record) => record.id} renderItem={(record) => <details className="recorded-event" open={expandedEventIds.includes(record.id)} onToggle={(event) => { const open = event.currentTarget.open; setExpandedEventIds((current) => open ? current.includes(record.id) ? current : [...current, record.id] : current.filter((id) => id !== record.id)) }}>
           <summary><span className="sequence">{String(record.sequence + 1).padStart(3, '0')}</span><strong>{record.event.eventName}</strong><span>{record.event.eventTag}</span><small>{record.event.timestamp ?? new Date(record.receivedAt).toLocaleTimeString()}</small></summary>
           <div className="json-head"><h3>Event JSON</h3><CopyButton text={JSON.stringify(record.event, null, 2)} /></div>
           <pre className="json-view"><code>{JSON.stringify(record.event, null, 2)}</code></pre>
-        </details>) : <EmptyState title="No recorded events" description="This session does not contain any events yet." />}
+        </details>} /> : <EmptyState title="No recorded events" description="This session does not contain any events yet." />}
       </section> : !error && <EmptyState title="Loading recorded events…" />}
     </> : <>
       <div className="recordings-toolbar">
@@ -83,10 +87,10 @@ export function RecordSessions() {
       </div>
       {loading ? <EmptyState title="Loading sessions…" /> : <>
         <p className="recording-count">{visible.length} {visible.length === 1 ? 'session' : 'sessions'}{recordingId && ' · Stop and save the active recording before deleting it.'}</p>
-        <div className="recording-grid" tabIndex={0} role="region" aria-label="Recorded sessions">{visible.map((session) => <article className={`panel recording-card ${checked.includes(session.id) ? 'selected' : ''}`} key={session.id}>
+        <VirtualGrid className="recording-grid" items={visible} minColumnWidth={270} estimateRowSize={245} getKey={(session) => session.id} renderItem={(session) => <article className={`panel recording-card ${checked.includes(session.id) ? 'selected' : ''}`}>
           <div className="recording-card-actions"><input type="checkbox" aria-label={`Select ${session.name}`} disabled={session.id === recordingId} checked={checked.includes(session.id)} onChange={() => setChecked((current) => current.includes(session.id) ? current.filter((id) => id !== session.id) : [...current, session.id])} /><TagBadge tone={session.status === 'RECORDING' ? 'green' : 'muted'}>{session.status === 'RECORDING' ? 'Recording' : 'Saved'}</TagBadge><IconButton label={`Delete ${session.name}`} disabled={session.id === recordingId} onClick={() => setPendingDelete([session.id])}><Trash2 size={18} /></IconButton></div>
           <button className="recording-card-open" onClick={() => { setError(''); setSelectedId(session.id) }}><FileText size={26} /><h2>{session.name}</h2><span>{session.totalEvents} events · {session.deviceId}</span><small>{new Date(session.startedAt).toLocaleString()}</small><strong>View events →</strong></button>
-        </article>)}</div>
+        </article>} />
         {!visible.length && !error && <EmptyState title={query.trim() ? 'No matching sessions' : 'No recorded sessions yet'} description={query.trim() ? 'Try another session name or device.' : 'Start a recording in Live Stream, then stop and save it to review the events here.'} />}
       </>}
     </>}

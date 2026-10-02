@@ -9,7 +9,11 @@ export async function flowExecutionRoutes(app: FastifyInstance, dependencies: Ap
     if (dependencies.flowExecutionService.getState().active) throw new AppError('VALIDATION_ACTIVE_SELECTION_LOCKED', 'Stop validation before changing selected flows.', 409)
     return dependencies.flowSelectionService.replace(z.object({ flowIds: z.array(z.string()) }).parse(request.body).flowIds)
   })
-  app.get('/api/flow-execution/status', async () => dependencies.flowExecutionService.getState())
+  app.get('/api/flow-execution/status', async () => ({
+    ...dependencies.flowExecutionService.getState(),
+    completion: dependencies.flowExecutionService.getLastCompletion(),
+  }))
+  app.post('/api/flow-execution/reset', async () => dependencies.flowExecutionService.reset())
   app.post('/api/flow-execution/validate', async (request) => {
     const input = z.object({ recordedSessionId: z.string().optional() }).parse(request.body ?? {})
     const recording = input.recordedSessionId ? dependencies.liveStreamService.getRecording(input.recordedSessionId) : null

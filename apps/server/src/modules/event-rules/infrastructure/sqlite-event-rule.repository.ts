@@ -30,14 +30,7 @@ export class SqliteEventRuleRepository implements EventRuleRepository {
   }
 
   delete(id: string): boolean {
-    return this.database.access((db) => db.transaction(() => {
-      const affected = (db.prepare('SELECT DISTINCT flow_id FROM flow_events WHERE event_definition_id = ?').all(id) as Array<{ flow_id: string }>).map((row) => row.flow_id)
-      const deleted = db.prepare('DELETE FROM event_definitions WHERE id = ?').run(id).changes > 0
-      const selectEvents = db.prepare('SELECT id FROM flow_events WHERE flow_id = ? ORDER BY position')
-      const updatePosition = db.prepare('UPDATE flow_events SET position = ? WHERE id = ?')
-      for (const flowId of affected) (selectEvents.all(flowId) as Array<{ id: string }>).forEach((event, position) => updatePosition.run(position, event.id))
-      return deleted
-    })())
+    return this.deleteMany([id]) > 0
   }
 
   deleteMany(ids: string[]): number {
@@ -49,7 +42,12 @@ export class SqliteEventRuleRepository implements EventRuleRepository {
       const deleted = db.prepare(`DELETE FROM event_definitions WHERE id IN (${placeholders})`).run(...uniqueIds).changes
       const selectEvents = db.prepare('SELECT id FROM flow_events WHERE flow_id = ? ORDER BY position')
       const updatePosition = db.prepare('UPDATE flow_events SET position = ? WHERE id = ?')
-      for (const flowId of affected) (selectEvents.all(flowId) as Array<{ id: string }>).forEach((event, position) => updatePosition.run(position, event.id))
+      const deleteFlow = db.prepare('DELETE FROM flows WHERE id = ?')
+      for (const flowId of affected) {
+        const events = selectEvents.all(flowId) as Array<{ id: string }>
+        if (events.length === 0) deleteFlow.run(flowId)
+        else events.forEach((event, position) => updatePosition.run(position, event.id))
+      }
       return deleted
     })())
   }

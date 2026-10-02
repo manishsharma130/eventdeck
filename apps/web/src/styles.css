@@ -188,3 +188,23 @@
 .recorded-event summary { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; cursor: pointer; overflow-wrap: anywhere; }
 .recorded-event summary small { margin-left: auto; }
 .recorded-event .json-view { max-height: 420px; overflow: auto; }
+.validation-issue-list { display: grid; gap: 8px; margin: 14px 0 0; padding-left: 22px; color: var(--text); }
+.validation-rule-section { display: grid; gap: 8px; margin-top: 16px; }
+.validation-rule-section > strong { font-size: 13px; color: var(--text); }
+.validation-rule-scroll { min-height: 96px; max-height: min(320px, 42vh); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 0 12px 12px 0; border-block: 1px solid var(--border-subtle); }
+.validation-rule-scroll .validation-issue-list { margin-top: 12px; }
+.route-scroll-boundary { height: 100%; min-height: 0; }
+.virtual-list { min-height: 0; overflow: auto; contain: strict; }
+.virtual-list-inner { position: relative; width: 100%; }
+.virtual-list-item { position: absolute; top: 0; left: 0; width: 100%; }
+.selected-flows { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
+.selected-flows-header { flex: none; }
+.execution-flow-list { flex: 1; }
+.virtual-grid { min-height: 0; overflow: auto; contain: strict; }
+.virtual-grid-row { position: absolute; top: 0; left: 0; width: 100%; display: grid; padding-bottom: 18px; }
+.recording-grid.virtual-grid { display: block; }
+.recording-detail-layout { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
+.recorded-event-list { flex: 1; margin-top: 12px; }
+.rules-grid .rules-table { display: flex; flex-direction: column; overflow: hidden; }
+.rule-list { flex: 1; }
+.definition-list.virtual-list, .flow-list.virtual-list { flex: 1; }

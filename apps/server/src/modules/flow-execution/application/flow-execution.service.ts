@@ -17,7 +17,28 @@ export class FlowExecutionService {
     eventBus.subscribe((event) => this.handleEvent(event))
   }
   getState(): { active: boolean; flows: RuntimeFlow[] } { return { active: this.context?.active ?? false, flows: this.context?.flows ?? [] } }
+  deleteWhenIdle<T>(operation: () => T): T {
+    if (this.context?.active) throw new AppError('VALIDATION_ACTIVE_DELETE_BLOCKED', 'Validation is currently running, so the delete operation cannot proceed. Stop validation first and try again.', 409)
+    const result = operation()
+    // Completed snapshots reference the old flow structure and must not be reused.
+    this.context = null
+    this.lastCompletion = null
+    return result
+  }
   getLastCompletion(): ValidationCompleted | null { return this.lastCompletion }
+  reset(): { status: 'reset'; flows: RuntimeFlow[] } {
+    if (this.context?.active) throw new AppError('VALIDATION_ACTIVE_RESET_BLOCKED', 'Stop validation before resetting its status.', 409)
+    const flows: RuntimeFlow[] = this.selection.getSelected().map((flow, flowIndex) => ({
+      ...flow,
+      flowIndex,
+      events: flow.events.map((event) => ({ ...event, status: 'PENDING' })),
+    }))
+    this.context = { active: false, eventIndex: new Map(), flows }
+    this.lastCompletion = null
+    const result = { status: 'reset' as const, flows }
+    this.websocket.broadcast('flow_execution.reset', result)
+    return result
+  }
   start(): { status: 'started'; flows: RuntimeFlow[] } {
     if (this.context?.active) throw new AppError('VALIDATION_ALREADY_ACTIVE', 'Flow validation is already active.', 409)
     this.lastCompletion = null

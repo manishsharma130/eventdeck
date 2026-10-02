@@ -1,7 +1,7 @@
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react'
 import { create } from 'zustand'
 
-type TabId = 'live' | 'rules' | 'build' | 'execution'
+type TabId = 'live' | 'rules' | 'build' | 'execution' | 'recordings'
 type TabUiState = {
   values: Record<string, unknown>
   setValue: (key: string, value: unknown) => void
