@@ -6,20 +6,21 @@ import { api } from '../services/api'
 import { useLiveStreamStore, type StreamEvent } from '../state/live-stream-store'
 import { useTabState } from '../state/tab-ui-store'
 
-const tones = { 'Firebase Analytics': 'blue', firebase_analytics: 'blue', Firebase: 'blue', 'Google Analytics': 'green', google_analytics: 'green', MoEngage: 'purple', moengage: 'purple' } as const
-const defaultTags = [
-  { value: 'google_analytics', label: 'Google Analytics' },
-  { value: 'firebase_analytics', label: 'Firebase Analytics' },
-  { value: 'moengage', label: 'MoEngage' },
-]
+const liveStreamTags = [
+  { value: 'google_analytics', label: 'GoogleAnalytics', tone: 'green' },
+  { value: 'branch', label: 'Branch', tone: 'blue' },
+  { value: 'moengage', label: 'Moengage', tone: 'purple' },
+] as const
+const tagPresentation = Object.fromEntries(liveStreamTags.map(({ value, label, tone }) => [value, { label, tone }])) as Record<string, { label: string; tone: 'green' | 'blue' | 'purple' }>
 type AnalyticsEvent = StreamEvent
 
 function EventRow({ event, selected, onSelect }: { event: AnalyticsEvent; selected: boolean; onSelect: () => void }) {
+  const presentation = tagPresentation[event.tag]
   return (
     <button className={`event-row ${selected ? 'selected' : ''}`} onClick={onSelect}>
       <span className="sequence">{String(event.sequence).padStart(3, '0')}</span>
       <span className="event-main"><strong>{event.name}</strong><small>{event.timestamp}</small></span>
-      <TagBadge tone={tones[event.tag as keyof typeof tones] ?? 'muted'}>{event.tag}</TagBadge>
+      <TagBadge tone={presentation?.tone ?? 'muted'}>{presentation?.label ?? event.tag}</TagBadge>
       <MoreVertical size={18} />
     </button>
   )
@@ -64,10 +65,6 @@ export function LiveStream() {
     overscan: 8,
   })
 
-  const tags = useMemo(() => {
-    const defaults = new Set(defaultTags.map((item) => item.value))
-    return [...defaultTags, ...[...new Set(visibleEvents.map((event) => event.tag))].filter((value) => !defaults.has(value)).map((value) => ({ value, label: value }))]
-  }, [visibleEvents])
   const json = selected ? JSON.stringify({ eventName: selected.name, eventTag: selected.tag, timestamp: selected.timestamp, eventParams: selected.params }, null, 2) : '{}'
   const command = async (action: 'play' | 'pause' | 'stop') => { try { setError(''); setRuntime(await api.stream(action)) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Stream command failed.') } }
   const toggleStream = async () => {
@@ -119,7 +116,7 @@ export function LiveStream() {
           <div className="live-filters">
             <label className="search-field"><Search size={19} /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by event name..." /></label>
             <Select value={tag} onChange={(e) => setTag(e.target.value)}>
-              <option value="All Tags">All Tags</option>{tags.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              <option value="All Tags">All Tags</option>{liveStreamTags.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </Select>
           </div>
           <div className="event-count" aria-label={`${visibleEvents.length} total events${hasActiveFilter ? `, ${filtered.length} matching events` : ''}, ${streamState === 'running' ? 'streaming' : streamState}`}>
