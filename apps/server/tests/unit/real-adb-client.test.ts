@@ -8,35 +8,35 @@ vi.mock('node:child_process', () => ({ spawn }))
 describe('RealAdbClient', () => {
   beforeEach(() => spawn.mockReset())
 
-  it('captures all priorities for the device-scoped AnalyticsEvent tag', async () => {
+  it('streams raw lines using threadtime and device-scoped dynamic filters', async () => {
     const child = new EventEmitter() as EventEmitter & { stdout: PassThrough; stderr: PassThrough; exitCode: number | null; killed: boolean; kill: ReturnType<typeof vi.fn> }
     child.stdout = new PassThrough()
     child.stderr = new PassThrough()
     child.exitCode = null
     child.killed = false
     child.kill = vi.fn()
-    spawn.mockReturnValue(child)
+    spawn.mockImplementation(() => { queueMicrotask(() => child.emit('spawn')); return child })
     const { RealAdbClient } = await import('../../src/modules/live-stream/infrastructure/real-adb-client.js')
 
     const messages: string[] = []
-    await new RealAdbClient().startAnalyticsLogcat('emulator-5554', (message) => messages.push(message), vi.fn())
+    await new RealAdbClient().startAnalyticsLogcat('emulator-5554', (message) => messages.push(message), vi.fn(), ['AnalyticsEvent:V', 'BranchSDK:V'])
     child.stdout.write('--------- beginning of main\n')
     child.stdout.write('D/OtherTag: {"eventName":"wrong_tag"}\n')
     child.stdout.write('D/AnalyticsEvent: {"eventName":"debug_event","eventParams":{}}\n')
 
     expect(spawn).toHaveBeenCalledTimes(1)
     const arguments_ = spawn.mock.calls[0][1] as string[]
-    expect(arguments_.slice(0, 6)).toEqual(['-s', 'emulator-5554', 'logcat', '-v', 'tag', '-T'])
+    expect(arguments_.slice(0, 6)).toEqual(['-s', 'emulator-5554', 'logcat', '-v', 'threadtime', '-T'])
     expect(arguments_[6]).toMatch(/^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/)
-    expect(arguments_.slice(7)).toEqual(['-s', 'AnalyticsEvent:V', '*:S'])
-    expect(messages).toEqual(['{"eventName":"debug_event","eventParams":{}}'])
+    expect(arguments_.slice(7)).toEqual(['AnalyticsEvent:V', 'BranchSDK:V', '*:S'])
+    expect(messages).toHaveLength(3)
   })
 
-  it('extracts only the AnalyticsEvent message portion', async () => {
-    const { extractAnalyticsEventMessage } = await import('../../src/modules/live-stream/infrastructure/real-adb-client.js')
-    expect(extractAnalyticsEventMessage('I/AnalyticsEvent( 1234): {"eventName":"open"}')).toBe('{"eventName":"open"}')
-    expect(extractAnalyticsEventMessage('AnalyticsEvent: {"eventName":"open"}')).toBe('{"eventName":"open"}')
-    expect(extractAnalyticsEventMessage('D/OtherTag: {"eventName":"open"}')).toBeNull()
-    expect(extractAnalyticsEventMessage('--------- beginning of main')).toBeNull()
+  it('rejects when adb cannot be spawned', async () => {
+    const child = new EventEmitter() as EventEmitter & { stdout: PassThrough; stderr: PassThrough }
+    child.stdout = new PassThrough(); child.stderr = new PassThrough()
+    spawn.mockImplementationOnce(() => { queueMicrotask(() => child.emit('error', new Error('ENOENT'))); return child })
+    const { RealAdbClient } = await import('../../src/modules/live-stream/infrastructure/real-adb-client.js')
+    await expect(new RealAdbClient().startAnalyticsLogcat('device', vi.fn(), vi.fn())).rejects.toThrow('ENOENT')
   })
 })

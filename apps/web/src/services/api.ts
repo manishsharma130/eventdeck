@@ -9,7 +9,7 @@ export type Flow = { id: string; name: string; events: FlowEvent[]; createdAt: n
 export type Device = { id: string; name?: string; type?: string; model?: string }
 export type StreamState = 'PLAYING' | 'PAUSED' | 'STOPPED'
 export type RuntimeState = { selectedDeviceId: string | null; streamState: StreamState; isRecording: boolean; recordingSessionId: string | null; recordingStartedForDeviceId?: string | null }
-export type LiveEvent = { id?: string; eventName: string; eventTag?: string; timestamp?: string; eventParams: Record<string, unknown> }
+export type LiveEvent = { id?: string; eventName: string; eventTag?: string; timestamp?: string | number; eventParams: Record<string, unknown> }
 export type RecordedSession = { id: string; name: string; deviceId: string; startedAt: number; endedAt: number | null; status: 'RECORDING' | 'COMPLETED'; totalEvents: number }
 export type SelectedFlow = { flowId: string; name: string; position: number; events: Array<{ flowEventId: string; eventDefinitionId: string; eventName: string; eventDefinitionName: string; position: number; rules: EventRule[]; status?: 'PENDING' | 'PASSED' | 'FAILED' }> }
 export type ExecutionState = { active: boolean; flows: Array<SelectedFlow & { flowIndex: number }>; completion?: Completion | null }
@@ -37,7 +37,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 const body = (value: unknown, method = 'POST'): RequestInit => ({ method, body: JSON.stringify(value) })
+export type ConnectorSettings = { google_analytics: boolean; branch: boolean; moengage: boolean }
+export type ConnectorConfiguration = { settings: ConnectorSettings; connectors: Array<{ id: string; label: string; configurable: boolean }> }
 export const api = {
+  connectorSettings: () => request<ConnectorConfiguration>('/api/settings/connectors'),
+  updateConnectorSettings: (settings: ConnectorSettings) => request<ConnectorConfiguration>('/api/settings/connectors', body(settings, 'PUT')),
   health: () => request<{ status: string }>('/health'),
   status: () => request<{ server: string; database: string; version: string }>('/api/status'),
   devices: () => request<Device[]>('/api/devices'),

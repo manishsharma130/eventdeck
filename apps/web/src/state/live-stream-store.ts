@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { api, type Device, type LiveEvent, type RuntimeState } from '../services/api'
+import { api, type ConnectorConfiguration, type Device, type LiveEvent, type RuntimeState } from '../services/api'
 import type { WebSocketMessage } from '../services/websocket'
 
 export type StreamEvent = {
@@ -36,6 +36,7 @@ const sameRuntime = (left: RuntimeState, right: RuntimeState) =>
 
 type LiveStreamStore = {
   runtime: RuntimeState
+  connectors: ConnectorConfiguration['connectors']
   devices: Device[]
   events: StreamEvent[]
   nextSequence: number
@@ -59,6 +60,7 @@ type LiveStreamStore = {
 export const useLiveStreamStore = create<LiveStreamStore>((set, get) => ({
   runtime: emptyRuntime,
   devices: [],
+  connectors: [],
   events: [],
   nextSequence: 1,
   selectedEventId: null,
@@ -68,10 +70,11 @@ export const useLiveStreamStore = create<LiveStreamStore>((set, get) => ({
   notice: '',
   hydrate: async () => {
     if (hydrationPromise) return hydrationPromise
-    hydrationPromise = Promise.all([api.devices(), api.runtime()]).then(([devices, runtime]) => {
+    hydrationPromise = Promise.all([api.devices(), api.runtime(), api.connectorSettings()]).then(([devices, runtime, configuration]) => {
       set((state) => ({
         devices: sameDevices(state.devices, devices) ? state.devices : devices,
         runtime: sameRuntime(state.runtime, runtime) ? state.runtime : runtime,
+        connectors: configuration.connectors,
         error: '',
       }))
     }).catch((cause) => {
@@ -103,8 +106,8 @@ export const useLiveStreamStore = create<LiveStreamStore>((set, get) => ({
           id: event.id ?? `${message.timestamp}-${sequence}`,
           sequence,
           name: event.eventName,
-          tag: event.eventTag ?? 'AnalyticsEvent',
-          timestamp: event.timestamp ?? new Date(message.timestamp).toLocaleString(),
+          tag: event.eventTag ?? 'analytics_event',
+          timestamp: typeof event.timestamp === 'number' ? new Date(event.timestamp).toLocaleString() : event.timestamp ?? new Date(message.timestamp).toLocaleString(),
           params: event.eventParams,
         }
         return { events: [mapped, ...state.events].slice(0, 1000), nextSequence: sequence + 1 }
@@ -117,3 +120,11 @@ export const useLiveStreamStore = create<LiveStreamStore>((set, get) => ({
     else if (message.type === 'recording.stopped') set({ notice: 'Recording saved.' })
   },
 }))
+
+// This module owns the store used by both React and a long-lived WebSocket
+// listener. Fast Refresh can replace the store without replacing that listener,
+// leaving incoming events in a detached store. Reload this boundary together
+// so the connection and UI always share the same instance.
+if (import.meta.hot) {
+  import.meta.hot.accept(() => window.location.reload())
+}

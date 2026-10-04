@@ -31,6 +31,7 @@ export class EventDeckWebSocket {
       this.onStatusChange('connected')
     })
     socket.addEventListener('message', (event) => {
+      if (socket !== this.socket || this.stopped) return
       try {
         const message = JSON.parse(String(event.data)) as WebSocketMessage
         this.listeners.forEach((listener) => listener(message))

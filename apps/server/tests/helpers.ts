@@ -9,7 +9,7 @@ import type { AppDependencies } from '../src/server/server.types.js'
 import type { AdbClient } from '../src/modules/live-stream/application/adb-client.js'
 
 export const fakeAdbClient: AdbClient = {
-  listDevices: async () => [],
+  runCommand: async () => undefined, listDevices: async () => [],
   startAnalyticsLogcat: async () => ({ stop: async () => undefined }),
 }
 

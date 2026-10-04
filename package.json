@@ -10,6 +10,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test:server": "pnpm --filter ./apps/server test",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test && pnpm test:web",
+    "test:web": "pnpm --filter ./apps/server exec vitest run --root ../web"
   }
 }

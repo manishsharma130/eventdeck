@@ -6,16 +6,12 @@ import { api } from '../services/api'
 import { useLiveStreamStore, type StreamEvent } from '../state/live-stream-store'
 import { useTabState } from '../state/tab-ui-store'
 
-const liveStreamTags = [
-  { value: 'google_analytics', label: 'GoogleAnalytics', tone: 'green' },
-  { value: 'branch', label: 'Branch', tone: 'blue' },
-  { value: 'moengage', label: 'Moengage', tone: 'purple' },
-] as const
-const tagPresentation = Object.fromEntries(liveStreamTags.map(({ value, label, tone }) => [value, { label, tone }])) as Record<string, { label: string; tone: 'green' | 'blue' | 'purple' }>
+const tagTones: Record<string, 'green' | 'blue' | 'purple'> = { google_analytics: 'green', branch: 'blue', moengage: 'purple', analytics_event: 'blue' }
 type AnalyticsEvent = StreamEvent
 
 function EventRow({ event, selected, onSelect }: { event: AnalyticsEvent; selected: boolean; onSelect: () => void }) {
-  const presentation = tagPresentation[event.tag]
+  const label = useLiveStreamStore(state => state.connectors.find(c => c.id === event.tag)?.label)
+  const presentation = { label: label ?? event.tag, tone: tagTones[event.tag] ?? 'blue' }
   return (
     <button className={`event-row ${selected ? 'selected' : ''}`} onClick={onSelect}>
       <span className="sequence">{String(event.sequence).padStart(3, '0')}</span>
@@ -31,6 +27,7 @@ export function LiveStream() {
   const [sessionName, setSessionName] = useTabState('live', 'sessionName', '')
   const [deviceRequired, setDeviceRequired] = useTabState('live', 'deviceRequired', false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const liveStreamTags = useLiveStreamStore(state => state.connectors)
   const runtime = useLiveStreamStore((state) => state.runtime)
   const visibleEvents = useLiveStreamStore((state) => state.events)
   const selectedEventId = useLiveStreamStore((state) => state.selectedEventId)
@@ -116,7 +113,7 @@ export function LiveStream() {
           <div className="live-filters">
             <label className="search-field"><Search size={19} /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by event name..." /></label>
             <Select value={tag} onChange={(e) => setTag(e.target.value)}>
-              <option value="All Tags">All Tags</option>{liveStreamTags.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              <option value="All Tags">All Tags</option>{liveStreamTags.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
             </Select>
           </div>
           <div className="event-count" aria-label={`${visibleEvents.length} total events${hasActiveFilter ? `, ${filtered.length} matching events` : ''}, ${streamState === 'running' ? 'streaming' : streamState}`}>
