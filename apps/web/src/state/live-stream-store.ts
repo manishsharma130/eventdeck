@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { api, type ConnectorConfiguration, type Device, type LiveEvent, type RuntimeState } from '../services/api'
+import { api, type Device, type LiveEvent, type RuntimeState } from '../services/api'
 import type { WebSocketMessage } from '../services/websocket'
 
 export type StreamEvent = {
@@ -36,13 +36,12 @@ const sameRuntime = (left: RuntimeState, right: RuntimeState) =>
 
 type LiveStreamStore = {
   runtime: RuntimeState
-  connectors: ConnectorConfiguration['connectors']
   devices: Device[]
   events: StreamEvent[]
   nextSequence: number
   selectedEventId: string | null
   query: string
-  tag: string
+  tag: string | null
   error: string
   notice: string
   hydrate(): Promise<void>
@@ -50,7 +49,7 @@ type LiveStreamStore = {
   setDevices(devices: Device[]): void
   setSelectedEvent(id: string | null): void
   setQuery(query: string): void
-  setTag(tag: string): void
+  setTag(tag: string | null): void
   setError(error: string): void
   setNotice(notice: string): void
   clearEvents(): void
@@ -60,21 +59,19 @@ type LiveStreamStore = {
 export const useLiveStreamStore = create<LiveStreamStore>((set, get) => ({
   runtime: emptyRuntime,
   devices: [],
-  connectors: [],
   events: [],
   nextSequence: 1,
   selectedEventId: null,
   query: '',
-  tag: 'All Tags',
+  tag: null,
   error: '',
   notice: '',
   hydrate: async () => {
     if (hydrationPromise) return hydrationPromise
-    hydrationPromise = Promise.all([api.devices(), api.runtime(), api.connectorSettings()]).then(([devices, runtime, configuration]) => {
+    hydrationPromise = Promise.all([api.devices(), api.runtime()]).then(([devices, runtime]) => {
       set((state) => ({
         devices: sameDevices(state.devices, devices) ? state.devices : devices,
         runtime: sameRuntime(state.runtime, runtime) ? state.runtime : runtime,
-        connectors: configuration.connectors,
         error: '',
       }))
     }).catch((cause) => {
@@ -89,13 +86,13 @@ export const useLiveStreamStore = create<LiveStreamStore>((set, get) => ({
   setTag: (tag) => set({ tag }),
   setError: (error) => set({ error }),
   setNotice: (notice) => set({ notice }),
-  clearEvents: () => set({ events: [], nextSequence: 1, selectedEventId: null, tag: 'All Tags' }),
+  clearEvents: () => set({ events: [], nextSequence: 1, selectedEventId: null, tag: null }),
   handleMessage: (message) => {
     if (message.type === 'connection.ready') { void get().hydrate(); return }
     if (message.type === 'live_stream.state_changed') { set({ runtime: message.payload as RuntimeState }); return }
     if (message.type === 'live_stream.device_changed') {
       const { deviceId } = message.payload as { deviceId: string }
-      set((state) => ({ runtime: { ...state.runtime, selectedDeviceId: deviceId }, events: [], nextSequence: 1, selectedEventId: null, tag: 'All Tags', notice: 'Device changed. Live Stream was cleared.' }))
+      set((state) => ({ runtime: { ...state.runtime, selectedDeviceId: deviceId }, events: [], nextSequence: 1, selectedEventId: null, tag: null, notice: 'Device changed. Live Stream was cleared.' }))
       return
     }
     if (message.type === 'live_stream.event') {

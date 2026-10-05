@@ -1,3 +1,4 @@
+import { matchesEventTag, useEventTagsStore } from '../state/event-tags-store'
 import { useEffect, useMemo, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Circle, MoreVertical, Pause, Play, Search, Square, Trash2, X } from 'lucide-react'
@@ -10,7 +11,7 @@ const tagTones: Record<string, 'green' | 'blue' | 'purple'> = { google_analytics
 type AnalyticsEvent = StreamEvent
 
 function EventRow({ event, selected, onSelect }: { event: AnalyticsEvent; selected: boolean; onSelect: () => void }) {
-  const label = useLiveStreamStore(state => state.connectors.find(c => c.id === event.tag)?.label)
+  const label = useEventTagsStore(state => state.definitions.find(tag => tag.value === event.tag)?.name)
   const presentation = { label: label ?? event.tag, tone: tagTones[event.tag] ?? 'blue' }
   return (
     <button className={`event-row ${selected ? 'selected' : ''}`} onClick={onSelect}>
@@ -27,7 +28,7 @@ export function LiveStream() {
   const [sessionName, setSessionName] = useTabState('live', 'sessionName', '')
   const [deviceRequired, setDeviceRequired] = useTabState('live', 'deviceRequired', false)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const liveStreamTags = useLiveStreamStore(state => state.connectors)
+  const liveStreamTags = useEventTagsStore(state => state.definitions)
   const runtime = useLiveStreamStore((state) => state.runtime)
   const visibleEvents = useLiveStreamStore((state) => state.events)
   const selectedEventId = useLiveStreamStore((state) => state.selectedEventId)
@@ -48,12 +49,14 @@ export function LiveStream() {
   const recording = runtime.isRecording
   const selectedDeviceId = runtime.selectedDeviceId
 
+  const selectedTag = liveStreamTags.find(definition => definition.value === tag)
+  const selectedValue = selectedTag?.value ?? null
   const filtered = useMemo(() => visibleEvents.filter((event) => {
     const search = query.toLowerCase()
     const matchesQuery = event.name.toLowerCase().includes(search) || JSON.stringify(event.params).toLowerCase().includes(search)
-    return matchesQuery && (tag === 'All Tags' || event.tag === tag)
-  }), [query, tag, visibleEvents])
-  const hasActiveFilter = Boolean(query.trim()) || tag !== 'All Tags'
+    return matchesQuery && matchesEventTag(event.tag, selectedValue)
+  }), [query, selectedValue, visibleEvents])
+  const hasActiveFilter = Boolean(query.trim()) || selectedValue !== null
 
   const virtualizer = useVirtualizer({
     count: filtered.length,
@@ -85,6 +88,9 @@ export function LiveStream() {
   }
 
   useEffect(() => { void hydrate() }, [hydrate])
+  useEffect(() => {
+    if (tag !== null && !selectedTag) setTag(null)
+  }, [tag, selectedTag, setTag])
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 3500); return () => window.clearTimeout(timer) }, [notice])
 
   return (
@@ -112,8 +118,8 @@ export function LiveStream() {
         <div className="live-filter-row">
           <div className="live-filters">
             <label className="search-field"><Search size={19} /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by event name..." /></label>
-            <Select value={tag} onChange={(e) => setTag(e.target.value)}>
-              <option value="All Tags">All Tags</option>{liveStreamTags.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            <Select value={selectedTag?.id ?? ''} onChange={(e) => setTag(liveStreamTags.find(definition => definition.id === e.target.value)?.value ?? null)}>
+              <option value="">All Tags</option>{liveStreamTags.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </Select>
           </div>
           <div className="event-count" aria-label={`${visibleEvents.length} total events${hasActiveFilter ? `, ${filtered.length} matching events` : ''}, ${streamState === 'running' ? 'streaming' : streamState}`}>

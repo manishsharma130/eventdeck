@@ -265,8 +265,14 @@
 .settings-screen>.page-header{margin:4px 0 2px}
 .settings-screen>.page-header h1{font-size:26px}
 .settings-section{width:100%;max-width:640px;flex:none;border:1px solid var(--border-default);border-radius:10px;background:var(--bg-panel,#101720)}
-.settings-section-heading{display:flex;align-items:center;gap:9px;min-height:46px;padding:0 14px;border-bottom:1px solid var(--border-subtle);color:var(--text-secondary)}
-.settings-section-heading h2{margin:0;flex:1;color:var(--text-primary);font-size:13px;font-weight:600}
+.settings-options{display:flex;flex-direction:column;gap:24px;width:100%;max-width:640px}
+.settings-option{min-width:0}
+.settings-option-heading{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.settings-option-icon{display:grid;place-items:center;width:32px;height:32px;flex:none;border-radius:8px;background:rgba(126,110,255,.1);color:#aaa0ff}
+.settings-option-heading>div{flex:1;min-width:0}
+.settings-option-heading h2{margin:0;color:var(--text-primary);font-size:15px;font-weight:600}
+.settings-option-heading p{margin:3px 0 0;color:var(--text-secondary);font-size:12px;line-height:1.4}
+.settings-option-heading>.setting-info{flex:none}
 .settings-list{list-style:none;padding:0;margin:0}
 .settings-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:0 14px;border-bottom:1px solid var(--border-subtle)}
 .settings-row:last-child{border-bottom:0}
@@ -277,8 +283,8 @@
 .settings-switch>span{display:block;width:12px;height:12px;border-radius:50%;background:#aab7ca;transition:transform .15s,background .15s}
 .settings-switch[aria-checked=true]{background:#6554ed;border-color:#8174ff}
 .settings-switch[aria-checked=true]>span{transform:translateX(14px);background:white}
-.settings-switch:disabled{cursor:wait}
-.settings-switch[aria-busy=true]{opacity:.6}
+.settings-switch:disabled{opacity:1;cursor:default}
+.settings-switch[aria-busy=true]{opacity:.6;cursor:wait}
 .setting-info{position:relative;display:flex;align-items:center}
 .setting-info-button{display:grid;place-items:center;width:26px;height:28px;padding:0;border:0;border-radius:5px;background:transparent;color:var(--text-muted);cursor:pointer}
 .setting-info-button:hover,.setting-info-button[aria-expanded=true]{color:#adabff;background:rgba(126,110,255,.1)}
@@ -289,3 +295,14 @@
 .setting-info-message button{display:grid;place-items:center;flex:none;padding:2px;border:0;border-radius:3px;background:none;color:var(--text-muted);cursor:pointer}
 .settings-error,.settings-loading{padding:12px 14px;font-size:12px;color:var(--text-secondary)}
 .settings-error{color:var(--danger)}.settings-error button{margin-left:8px;border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer}
+
+.settings-connector-controls{min-width:0;margin:0;padding:0;border:0}
+
+.settings-tags-heading{padding:12px 14px 7px;border-top:1px solid var(--border-subtle);font-size:11px;font-weight:600;color:var(--text-secondary)}
+.event-tag-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 66px;font-size:12px}
+.event-tag-row>span:first-child,.event-tag-row code{overflow-wrap:anywhere}
+.event-tag-row code{font-size:11px;color:var(--text-secondary);white-space:pre-wrap}
+.settings-tag-delete{justify-self:end;display:grid;place-items:center;width:28px;height:28px;border:0;border-radius:5px;background:transparent;color:var(--text-muted);cursor:pointer}
+.settings-tag-delete:hover{color:var(--danger);background:rgba(255,90,90,.08)}
+.settings-tags-empty{margin:0;padding:4px 14px 8px;font-size:12px;color:var(--text-muted)}
+.settings-tags-footer{padding:9px 14px 12px}.settings-tags-footer .button{min-height:30px;font-size:12px;padding:0 10px}
