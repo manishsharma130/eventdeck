@@ -1,3 +1,4 @@
+import type { StorageService } from '../modules/storage/storage.service.js'
 import type { Database } from '../database/database.types.js'
 import type { AppLogger } from '../logging/logger.js'
 import type { FastifyWebSocketGateway } from '../websocket/websocket.gateway.js'
@@ -9,6 +10,7 @@ import type { FlowSelectionService } from '../modules/flow-execution/application
 import type { LiveStreamService } from '../modules/live-stream/application/live-stream.service.js'
 
 export type AppDependencies = {
+  storageService: StorageService
   database: Database
   logger: AppLogger
   websocketGateway: FastifyWebSocketGateway

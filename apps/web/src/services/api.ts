@@ -19,9 +19,12 @@ export class ApiError extends Error {
   constructor(public code: string, message: string, public details?: unknown, public status = 0) { super(message) }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, timeoutMs: number | null = 10_000): Promise<T> {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 10_000)
+  const timeout = timeoutMs === null ? undefined : window.setTimeout(() => controller.abort(), timeoutMs)
+  const abort = () => controller.abort(init.signal?.reason)
+  if (init.signal?.aborted) abort()
+  else init.signal?.addEventListener('abort', abort, { once: true })
   try {
     const response = await fetch(`${environment.apiUrl}${path}`, { ...init, headers: { Accept: 'application/json', ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers }, signal: controller.signal })
     const body = response.status === 204 ? undefined : await response.json().catch(() => undefined)
@@ -31,15 +34,39 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
     return body as T
   } catch (error) {
+    if (init.signal?.aborted) throw new DOMException('Request cancelled.', 'AbortError')
     if (error instanceof ApiError) throw error
     throw new ApiError(error instanceof DOMException && error.name === 'AbortError' ? 'REQUEST_TIMEOUT' : 'SERVER_UNREACHABLE', error instanceof DOMException && error.name === 'AbortError' ? 'The server did not respond in time.' : 'Could not reach the EventDeck server.')
-  } finally { window.clearTimeout(timeout) }
+  } finally { if (timeout !== undefined) window.clearTimeout(timeout); init.signal?.removeEventListener('abort', abort) }
 }
 
 const body = (value: unknown, method = 'POST'): RequestInit => ({ method, body: JSON.stringify(value) })
 export type ConnectorSettings = { google_analytics: boolean; branch: boolean; moengage: boolean }
 export type ConnectorConfiguration = { settings: ConnectorSettings; connectors: Array<{ id: string; label: string; configurable: boolean }> }
+export type StorageModuleId = 'recordings' | 'rules' | 'build' | 'execution'
+export type StorageUsage = {
+  totalBytes: number
+  measurement: 'stored_payload_bytes'
+  modules: Array<{ id: StorageModuleId; name: string; bytes: number; clears: StorageModuleId[] }>
+}
+export type StorageOperation = {
+  id: string
+  target: StorageModuleId | 'all'
+  affected: StorageModuleId[]
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'INTERRUPTED'
+  error: string | null
+  startedAt: number
+  completedAt: number | null
+}
+export type StorageStatus = {
+  deletionAllowed: boolean
+  blockers: Array<'LIVE_STREAM_PLAYING' | 'RECORDING_ACTIVE' | 'VALIDATION_ACTIVE' | 'DELETION_ACTIVE'>
+  operation: StorageOperation | null
+}
 export const api = {
+  storage: (signal?: AbortSignal) => request<StorageUsage>('/api/storage', { signal }, null),
+  storageStatus: () => request<StorageStatus>('/api/storage/status'),
+  clearStorage: (operationId: string, target: StorageModuleId | 'all') => request<StorageOperation>('/api/storage/clear', body({ operationId, target, confirmed: true }), null),
   connectorSettings: () => request<ConnectorConfiguration>('/api/settings/connectors'),
   updateConnectorSettings: (settings: ConnectorSettings) => request<ConnectorConfiguration>('/api/settings/connectors', body(settings, 'PUT')),
   health: () => request<{ status: string }>('/health'),

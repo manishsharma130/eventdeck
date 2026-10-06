@@ -38,6 +38,7 @@ export async function startServer(environment: NodeJS.ProcessEnv = process.env):
       if (closed) return
       closed = true
       logger.info('EventDeck server shutting down')
+      await dependencies.storageService.close()
       await dependencies.liveStreamService.close()
       websocketGateway.close()
       await app.close()

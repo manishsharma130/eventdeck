@@ -1,8 +1,9 @@
 import { useEventTagsStore } from '../state/event-tags-store'
 import { Button, Input, Modal } from '../components/ui'
 import { memo, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { Info, Plug, Tags, Plus, Trash2, X } from 'lucide-react'
-import { api, type ConnectorConfiguration, type ConnectorSettings } from '../services/api'
+import { Info, Plug, Tags, Plus, Trash2, HardDrive, X } from 'lucide-react'
+import { api, type ConnectorConfiguration, type ConnectorSettings, type StorageUsage, type StorageModuleId } from '../services/api'
+import { useStorageOperationStore } from '../state/storage-operation-store'
 
 const connectorHelp: Record<string, string> = {
   analytics_event: 'The core EventDeck connector is always enabled. Events keep the eventTag supplied by your app.',
@@ -153,12 +154,141 @@ function EventTagsOption() {
   </SettingsOption>
 }
 
+function formatStorage(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${(bytes / 1024 ** unit).toLocaleString(undefined, { maximumFractionDigits: unit === 0 ? 0 : 1 })} ${units[unit]}`
+}
+
+function StorageOption() {
+  const [usage, setUsage] = useState<StorageUsage | null>(null)
+  const [target, setTarget] = useState<StorageModuleId | 'all' | null>(null)
+  const storageStatus = useStorageOperationStore(state => state.status)
+  const setStorageOperation = useStorageOperationStore(state => state.setOperation)
+  const hydrateStorage = useStorageOperationStore(state => state.hydrate)
+  const busy = storageStatus?.operation?.status === 'RUNNING'
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [blockerToast, setBlockerToast] = useState('')
+  const calculation = useRef<AbortController | null>(null)
+  const mounted = useRef(false)
+  const clearing = useRef(false)
+  const load = useCallback(() => {
+    calculation.current?.abort()
+    const controller = new AbortController()
+    calculation.current = controller
+    setLoading(true); setError('')
+    void api.storage(controller.signal).then(result => {
+      if (!controller.signal.aborted && mounted.current) setUsage(result)
+    }).catch(cause => {
+      if (!controller.signal.aborted && mounted.current) setError(cause instanceof Error ? cause.message : 'Could not load storage.')
+    }).finally(() => {
+      if (!controller.signal.aborted && mounted.current) setLoading(false)
+    })
+  }, [])
+  useEffect(() => {
+    mounted.current = true
+    void hydrateStorage()
+    load()
+    const changed = () => { if (!clearing.current) load() }
+    window.addEventListener('eventdeck:storage-cleared', changed)
+    return () => {
+      mounted.current = false
+      calculation.current?.abort()
+      window.removeEventListener('eventdeck:storage-cleared', changed)
+    }
+  }, [hydrateStorage, load])
+  useEffect(() => {
+    const operation = storageStatus?.operation
+    if (!operation || operation.status === 'RUNNING') return
+    if (clearing.current) {
+      clearing.current = false
+      setNotice(operation.status === 'COMPLETED' ? 'Storage cleared.' : '')
+      setError(operation.status === 'COMPLETED' ? '' : operation.error ?? 'Storage deletion did not complete.')
+      load()
+    }
+  }, [load, storageStatus?.operation])
+  const selected = usage?.modules.find(module => module.id === target)
+  const affected = target === 'all' ? usage?.modules ?? [] : usage?.modules.filter(module => selected?.clears.includes(module.id)) ?? []
+  const unaffected = usage?.modules.filter(module => !affected.some(item => item.id === module.id)) ?? []
+  const clear = async () => {
+    if (!target || clearing.current) return
+    clearing.current = true
+    calculation.current?.abort()
+    setLoading(false)
+    setError(''); setNotice('')
+    try {
+      const operation = await api.clearStorage(crypto.randomUUID(), target)
+      if (!mounted.current) return
+      setStorageOperation(operation)
+      setTarget(null)
+      await hydrateStorage()
+    } catch (cause) {
+      clearing.current = false
+      if (mounted.current) {
+        setError(cause instanceof Error ? cause.message : 'Could not clear storage.')
+        void hydrateStorage()
+      }
+    }
+  }
+  const blockerMessage = storageStatus?.blockers.includes('RECORDING_ACTIVE') ? 'Stop and save the active recording before clearing data.'
+    : storageStatus?.blockers.includes('VALIDATION_ACTIVE') ? 'Stop flow validation before clearing data.'
+    : storageStatus?.blockers.includes('LIVE_STREAM_PLAYING') ? 'Stop Live Stream before clearing data.'
+    : storageStatus?.blockers.includes('DELETION_ACTIVE') ? 'A storage deletion is already running.'
+    : ''
+  useEffect(() => {
+    if (!blockerMessage) { setBlockerToast(''); return }
+    setBlockerToast(blockerMessage)
+    const timer = window.setTimeout(() => setBlockerToast(''), 4500)
+    return () => window.clearTimeout(timer)
+  }, [blockerMessage])
+  const operationFailure = ['FAILED', 'INTERRUPTED'].includes(storageStatus?.operation?.status ?? '')
+    ? storageStatus?.operation?.error ?? 'The last storage deletion did not complete.'
+    : ''
+  return <SettingsOption title="Storage" description="Review and clear stored module data." icon={<HardDrive size={18} />} busy={busy || loading}
+    information="Sizes count stored module data, excluding SQLite indexes, unused pages and database overhead. Flow Execution includes saved flow selections; clearing it also resets in-memory results. Stop affected recordings or validation before clearing. Connector preferences and event tags are kept.">
+    <div className="storage-total"><span>Total Used</span>{loading ? <span className="storage-shimmer storage-total-placeholder" aria-hidden="true" /> : <strong>{usage ? formatStorage(usage.totalBytes) : '—'}</strong>}</div>
+    {error && !target && <div role="alert" className="settings-error">{error} <button type="button" onClick={load}>Retry</button></div>}
+    {!error && operationFailure && <div role="alert" className="settings-error">{operationFailure}</div>}
+    {notice && <div role="status" className="settings-loading">{notice}</div>}
+    {blockerToast && <div className="app-toast error storage-blocker-toast" role="status">
+      <strong>Storage deletion unavailable</strong><span>{blockerToast}</span>
+      <button type="button" aria-label="Dismiss message" onClick={() => setBlockerToast('')}>×</button>
+    </div>}
+    {blockerMessage && <div role="status" className="settings-loading">{blockerMessage} Storage sizes remain available.</div>}
+    {loading && <div className="storage-skeleton" role="status" aria-label="Calculating storage usage">
+      {[0, 1, 2, 3].map(row => <div className="settings-row" key={row} aria-hidden="true"><span className="storage-shimmer storage-label-placeholder" /><span className="storage-shimmer storage-size-placeholder" /></div>)}
+    </div>}
+    {!loading && <ul className="settings-list">
+      {usage?.modules.map(module => <li className="settings-row storage-row" key={module.id}>
+        <span>{module.name}</span><span className="storage-size">{formatStorage(module.bytes)}</span>
+        <button type="button" className="settings-tag-delete" aria-label={`Clear ${module.name} data`} disabled={busy || storageStatus?.deletionAllowed === false} onClick={() => { setError(''); setTarget(module.id) }}><Trash2 size={15} /></button>
+      </li>)}
+    </ul>}
+    <div className="settings-tags-footer"><Button variant="primary" disabled={!usage || busy || loading || storageStatus?.deletionAllowed === false} onClick={() => { setError(''); setTarget('all') }}><Trash2 size={14} />Clear All Data</Button></div>
+    {target && <Modal title={target === 'all' ? 'Clear all EventDeck data?' : `Clear ${selected?.name} data?`} onClose={() => { if (!busy) { setTarget(null); setError('') } }} actions={<>
+      <Button disabled={busy} onClick={() => { setTarget(null); setError('') }}>Cancel</Button>
+      <Button variant="primary" disabled={busy} onClick={() => void clear()}>{busy ? 'Clearing…' : target === 'all' ? 'Clear All' : 'Clear Data'}</Button>
+    </>}>
+      {affected.length > 1 && target !== 'all' && <p>Other modules depend on {selected?.name}. Their data will also be removed.</p>}
+      <p>This will permanently remove stored data from:</p>
+      <ul>{affected.map(module => <li key={module.id}>{module.name}</li>)}</ul>
+      {unaffected.length > 0 && <p>{unaffected.map(module => module.name).join(', ')} will not be affected.</p>}
+      <p>This action cannot be undone.</p>
+      {error && <p className="settings-error" role="alert">{error}</p>}
+    </Modal>}
+  </SettingsOption>
+}
+
 export function Settings() {
   return <section className="screen settings-screen">
     <header className="page-header"><h1>Settings</h1></header>
     <div className="settings-options">
       <ConnectorsOption />
       <EventTagsOption />
+      <StorageOption />
     </div>
   </section>
 }

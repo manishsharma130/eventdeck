@@ -136,6 +136,13 @@ export class LiveStreamService {
     return completed
   }
 
+  withRecordingStorageIdle<T>(operation: () => T): Promise<T> {
+    return this.enqueue(async () => {
+      if (this.state.isRecording) throw new AppError('RECORDING_ACTIVE_STORAGE_CLEAR_BLOCKED', 'Stop and save the active recording before clearing Recording Session data.', 409)
+      return operation()
+    })
+  }
+
   listRecordings(): RecordedSession[] { return this.recordings.list() }
   getRecording(id: string): NonNullable<ReturnType<RecordingRepository['findById']>> {
     const session = this.recordings.findById(id)

@@ -27,3 +27,9 @@ export function useTabState<T>(tab: TabId, key: string, initialValue: T | (() =>
   }, [storeKey])
   return [value as T, setValue]
 }
+
+export function clearTabUiState(tabs: string[]): void {
+  useTabUiStore.setState(state => ({ values: Object.fromEntries(
+    Object.entries(state.values).filter(([key]) => !tabs.includes(key.split(':')[0])),
+  ) }))
+}
