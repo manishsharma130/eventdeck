@@ -37,6 +37,7 @@ export class FlowService {
     })
   }
   delete(id: string): { deleted: true } { this.get(id); this.repository.delete(id); return { deleted: true } }
+  deleteMany(ids: string[]): { deleted: number } { return { deleted: this.repository.deleteMany(ids) } }
 
   private validate(input: FlowInput): FlowInput {
     const name = input.name.trim()

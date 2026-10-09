@@ -1,4 +1,26 @@
+import { readFileSync } from 'node:fs'
+import { cliHelp, parseCliArguments } from './cli-options.js'
 import { startServer } from './server/start-server.js'
+
+const action = (() => {
+  try {
+    return parseCliArguments(process.argv.slice(2))
+  } catch (error) {
+    console.error(`${error instanceof Error ? error.message : String(error)}\n\n${cliHelp}`)
+    process.exit(1)
+  }
+})()
+
+if (action === 'help') {
+  console.log(cliHelp)
+  process.exit(0)
+}
+
+if (action === 'version') {
+  const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
+  console.log(packageJson.version)
+  process.exit(0)
+}
 
 let runtime: Awaited<ReturnType<typeof startServer>> | undefined
 

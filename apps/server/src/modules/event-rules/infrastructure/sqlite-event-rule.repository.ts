@@ -5,6 +5,7 @@ import type { EventDefinition, EventRuleCondition } from '../domain/event-rule.t
 
 type DefinitionRow = { id: string; name: string; event_value: string; created_at: number; updated_at: number }
 type RuleRow = { id: string; param_key: string; match_type: EventRuleCondition['matchType']; expected_value: string | null }
+type DefinitionWithRuleRow = DefinitionRow & { rule_id: string | null; param_key: string | null; match_type: EventRuleCondition['matchType'] | null; expected_value: string | null }
 
 export class SqliteEventRuleRepository implements EventRuleRepository {
   constructor(private readonly database: SqliteDatabase) {}
@@ -29,12 +30,24 @@ export class SqliteEventRuleRepository implements EventRuleRepository {
   }
 
   delete(id: string): boolean {
+    return this.deleteMany([id]) > 0
+  }
+
+  deleteMany(ids: string[]): number {
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return 0
     return this.database.access((db) => db.transaction(() => {
-      const affected = (db.prepare('SELECT DISTINCT flow_id FROM flow_events WHERE event_definition_id = ?').all(id) as Array<{ flow_id: string }>).map((row) => row.flow_id)
-      const deleted = db.prepare('DELETE FROM event_definitions WHERE id = ?').run(id).changes > 0
+      const placeholders = uniqueIds.map(() => '?').join(',')
+      const affected = (db.prepare(`SELECT DISTINCT flow_id FROM flow_events WHERE event_definition_id IN (${placeholders})`).all(...uniqueIds) as Array<{ flow_id: string }>).map((row) => row.flow_id)
+      const deleted = db.prepare(`DELETE FROM event_definitions WHERE id IN (${placeholders})`).run(...uniqueIds).changes
       const selectEvents = db.prepare('SELECT id FROM flow_events WHERE flow_id = ? ORDER BY position')
       const updatePosition = db.prepare('UPDATE flow_events SET position = ? WHERE id = ?')
-      for (const flowId of affected) (selectEvents.all(flowId) as Array<{ id: string }>).forEach((event, position) => updatePosition.run(position, event.id))
+      const deleteFlow = db.prepare('DELETE FROM flows WHERE id = ?')
+      for (const flowId of affected) {
+        const events = selectEvents.all(flowId) as Array<{ id: string }>
+        if (events.length === 0) deleteFlow.run(flowId)
+        else events.forEach((event, position) => updatePosition.run(position, event.id))
+      }
       return deleted
     })())
   }
@@ -60,13 +73,49 @@ export class SqliteEventRuleRepository implements EventRuleRepository {
     })
   }
 
+  findManyByIds(ids: string[]): EventDefinition[] {
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return []
+    const placeholders = uniqueIds.map(() => '?').join(',')
+    return this.database.access((db) => this.mapJoinedRows(db.prepare(`SELECT d.id, d.name, d.event_value, d.created_at, d.updated_at,
+      r.id AS rule_id, r.param_key, r.match_type, r.expected_value
+      FROM event_definitions d LEFT JOIN event_rule_conditions r ON r.event_definition_id = d.id
+      WHERE d.id IN (${placeholders})
+      ORDER BY d.name COLLATE NOCASE, r.param_key, r.match_type, r.expected_value`).all(...uniqueIds) as DefinitionWithRuleRow[]))
+  }
+
   list(): EventDefinition[] {
-    return this.database.access((db) => (db.prepare('SELECT id, name, event_value, created_at, updated_at FROM event_definitions ORDER BY name COLLATE NOCASE').all() as DefinitionRow[])
-      .map((row) => this.mapDefinition(db, row)))
+    return this.database.access((db) => {
+      const rows = db.prepare(`SELECT d.id, d.name, d.event_value, d.created_at, d.updated_at,
+        r.id AS rule_id, r.param_key, r.match_type, r.expected_value
+        FROM event_definitions d LEFT JOIN event_rule_conditions r ON r.event_definition_id = d.id
+        ORDER BY d.name COLLATE NOCASE, r.param_key, r.match_type, r.expected_value`).all() as DefinitionWithRuleRow[]
+      return this.mapJoinedRows(rows)
+    })
+  }
+
+  private mapJoinedRows(rows: DefinitionWithRuleRow[]): EventDefinition[] {
+    const definitions = new Map<string, EventDefinition>()
+    for (const row of rows) {
+      let definition = definitions.get(row.id)
+      if (!definition) {
+        definition = { id: row.id, name: row.name, eventValue: row.event_value, createdAt: row.created_at, updatedAt: row.updated_at, rules: [] }
+        definitions.set(row.id, definition)
+      }
+      if (row.rule_id && row.param_key && row.match_type) definition.rules.push({ id: row.rule_id, paramKey: row.param_key, matchType: row.match_type, ...(row.expected_value === null ? {} : { expectedValue: row.expected_value }) })
+    }
+    return [...definitions.values()]
   }
 
   countFlowReferences(id: string): number {
     return this.database.access((db) => (db.prepare('SELECT COUNT(DISTINCT flow_id) AS count FROM flow_events WHERE event_definition_id = ?').get(id) as { count: number }).count)
+  }
+
+  countFlowReferencesMany(ids: string[]): number {
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return 0
+    const placeholders = uniqueIds.map(() => '?').join(',')
+    return this.database.access((db) => (db.prepare(`SELECT COUNT(DISTINCT flow_id) AS count FROM flow_events WHERE event_definition_id IN (${placeholders})`).get(...uniqueIds) as { count: number }).count)
   }
 
   private insertRules(db: BetterSqlite3.Database, definition: EventDefinition): void {

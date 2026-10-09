@@ -20,6 +20,11 @@ export class EventRuleService {
     if (!definition) throw new AppError('EVENT_DEFINITION_NOT_FOUND', 'Event definition was not found.', 404)
     return definition
   }
+  usage(id: string): { flowCount: number } {
+    this.get(id)
+    return { flowCount: this.repository.countFlowReferences(id) }
+  }
+  usageMany(ids: string[]): { flowCount: number } { return { flowCount: this.repository.countFlowReferencesMany(ids) } }
 
   create(input: EventDefinitionInput): EventDefinition {
     const normalized = this.validate(input)
@@ -55,10 +60,17 @@ export class EventRuleService {
     this.index.remove(id)
     return { deleted: true, affectedFlows }
   }
+  deleteMany(ids: string[]): { deleted: number; affectedFlows: number } {
+    const uniqueIds = [...new Set(ids)]
+    const affectedFlows = this.repository.countFlowReferencesMany(uniqueIds)
+    const deleted = this.repository.deleteMany(uniqueIds)
+    for (const id of uniqueIds) this.index.remove(id)
+    return { deleted, affectedFlows }
+  }
 
   private validate(input: EventDefinitionInput): ReturnType<typeof normalizeDefinition> {
     const normalized = normalizeDefinition(input)
-    if (!normalized.name || !normalized.eventValue) throw new AppError('INVALID_EVENT_DEFINITION', 'Event name and event value are required.', 400)
+    if (!normalized.eventValue) throw new AppError('INVALID_EVENT_DEFINITION', 'Event value is required.', 400)
     for (const rule of normalized.rules) {
       if (!rule.paramKey) throw new AppError('INVALID_EVENT_RULE', 'Rule parameter key is required.', 400)
       if (rule.matchType !== 'exists' && !rule.expectedValue) throw new AppError('INVALID_EVENT_RULE', `Expected value is required for ${rule.matchType} rules.`, 400)

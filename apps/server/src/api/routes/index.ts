@@ -1,3 +1,4 @@
+import { storageRoutes } from '../../modules/storage/storage.routes.js'
 import type { FastifyInstance } from 'fastify'
 import type { AppDependencies } from '../../server/server.types.js'
 import { healthRoutes } from './health.routes.js'
@@ -7,6 +8,7 @@ import { flowExecutionRoutes } from '../../modules/flow-execution/api/flow-execu
 import { liveStreamRoutes } from '../../modules/live-stream/api/live-stream.routes.js'
 
 export async function registerRoutes(app: FastifyInstance, dependencies: AppDependencies): Promise<void> {
+  await storageRoutes(app, dependencies)
   await healthRoutes(app, dependencies)
   await liveStreamRoutes(app, dependencies)
   await eventRuleRoutes(app, dependencies)

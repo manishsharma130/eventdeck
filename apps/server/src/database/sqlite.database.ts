@@ -8,7 +8,7 @@ import { runMigrations } from './migration-runner.js'
 export class SqliteDatabase implements Database {
   private readonly connection: BetterSqlite3.Database
 
-  constructor(path: string) {
+  constructor(readonly path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true })
     this.connection = new BetterSqlite3(path)
     this.connection.pragma('foreign_keys = ON')

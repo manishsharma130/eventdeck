@@ -5,6 +5,7 @@ import type { Flow, FlowEvent } from '../domain/flow.types.js'
 
 type FlowRow = { id: string; name: string; created_at: number; updated_at: number }
 type FlowEventRow = { id: string; flow_id: string; event_definition_id: string; position: number }
+type FlowWithEventRow = FlowRow & { event_id: string | null; event_definition_id: string | null; position: number | null }
 
 export class SqliteFlowRepository implements FlowRepository {
   constructor(private readonly database: SqliteDatabase) {}
@@ -24,6 +25,12 @@ export class SqliteFlowRepository implements FlowRepository {
     })())
   }
   delete(id: string): boolean { return this.database.access((db) => db.prepare('DELETE FROM flows WHERE id = ?').run(id).changes > 0) }
+  deleteMany(ids: string[]): number {
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return 0
+    const placeholders = uniqueIds.map(() => '?').join(',')
+    return this.database.access((db) => db.prepare(`DELETE FROM flows WHERE id IN (${placeholders})`).run(...uniqueIds).changes)
+  }
   findById(id: string): Flow | null {
     return this.database.access((db) => {
       const row = db.prepare('SELECT id, name, created_at, updated_at FROM flows WHERE id = ?').get(id) as FlowRow | undefined
@@ -36,12 +43,38 @@ export class SqliteFlowRepository implements FlowRepository {
       return row ? this.map(db, row) : null
     })
   }
+  findManyByIds(ids: string[]): Flow[] {
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return []
+    const placeholders = uniqueIds.map(() => '?').join(',')
+    return this.database.access((db) => this.mapJoinedRows(db.prepare(`SELECT f.id, f.name, f.created_at, f.updated_at,
+      fe.id AS event_id, fe.event_definition_id, fe.position
+      FROM flows f LEFT JOIN flow_events fe ON fe.flow_id = f.id
+      WHERE f.id IN (${placeholders})
+      ORDER BY f.name COLLATE NOCASE, fe.position`).all(...uniqueIds) as FlowWithEventRow[]))
+  }
   list(search = ''): Flow[] {
     return this.database.access((db) => {
-      const rows = db.prepare("SELECT id, name, created_at, updated_at FROM flows WHERE name LIKE ? ESCAPE '\\' ORDER BY name COLLATE NOCASE")
-        .all(`%${search.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`) as FlowRow[]
-      return rows.map((row) => this.map(db, row))
+      const rows = db.prepare(`SELECT f.id, f.name, f.created_at, f.updated_at,
+        fe.id AS event_id, fe.event_definition_id, fe.position
+        FROM flows f LEFT JOIN flow_events fe ON fe.flow_id = f.id
+        WHERE f.name LIKE ? ESCAPE '\\'
+        ORDER BY f.name COLLATE NOCASE, fe.position`)
+        .all(`%${search.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`) as FlowWithEventRow[]
+      return this.mapJoinedRows(rows)
     })
+  }
+  private mapJoinedRows(rows: FlowWithEventRow[]): Flow[] {
+    const flows = new Map<string, Flow>()
+    for (const row of rows) {
+      let flow = flows.get(row.id)
+      if (!flow) {
+        flow = { id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at, events: [] }
+        flows.set(row.id, flow)
+      }
+      if (row.event_id && row.event_definition_id && row.position !== null) flow.events.push({ id: row.event_id, flowId: row.id, eventDefinitionId: row.event_definition_id, position: row.position })
+    }
+    return [...flows.values()]
   }
   private insertEvents(db: BetterSqlite3.Database, flow: Flow): void {
     const insert = db.prepare('INSERT INTO flow_events (id, flow_id, event_definition_id, position) VALUES (?, ?, ?, ?)')

@@ -1,3 +1,4 @@
+import { StorageService } from '../modules/storage/storage.service.js'
 import type { SqliteDatabase } from '../database/sqlite.database.js'
 import type { AppLogger } from '../logging/logger.js'
 import { FlowService } from '../modules/build-flow/application/flow.service.js'
@@ -32,8 +33,9 @@ export function createDependencies(
   const liveEventBus = new LiveEventBus()
   const liveStreamService = new LiveStreamService(adbClient, new SqliteRecordingRepository(database), websocketGateway, liveEventBus, logger)
   const flowExecutionService = new FlowExecutionService(flowSelectionService, websocketGateway, liveEventBus)
+  const storageService = new StorageService(database, eventRuleIndex, flowExecutionService, liveStreamService, websocketGateway)
   return {
-    database, logger, websocketGateway, version, eventRuleService, eventRuleIndex, flowService,
+    storageService, database, logger, websocketGateway, version, eventRuleService, eventRuleIndex, flowService,
     flowSelectionService, flowExecutionService, liveStreamService,
   }
 }
