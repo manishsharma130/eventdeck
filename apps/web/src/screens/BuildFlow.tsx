@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { GripVertical, Plus, Search, Trash2, X } from 'lucide-react'
+import { GitBranch, GripVertical, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { Button, Checkbox, IconButton, Input, Modal, PageHeader, Panel } from '../components/ui'
 import { api, ApiError, type EventDefinition, type Flow } from '../services/api'
 import { useTabState } from '../state/tab-ui-store'
@@ -35,8 +35,8 @@ export function BuildFlow() {
   const clear = () => { setSelectedId(null); setName(''); setSelectedEvents([]); setMessage('') }
   const closeCreation = () => { clear(); setCreationOpen(false) }
   const addFlow = () => { clear(); setCreationOpen(true) }
-  const save = async () => { try { const saved = selectedId ? await api.updateFlow(selectedId, name, selectedEvents) : await api.createFlow(name, selectedEvents); setFlows((current) => sortFlows(selectedId ? current.map((flow) => flow.id === saved.id ? saved : flow) : [...current, saved])); closeCreation(); setMessage('Flow saved.') } catch (cause) { if (cause instanceof ApiError && cause.code === 'FLOW_NAME_ALREADY_EXISTS') { setDuplicateName(`${cause.message} Please use a different name.`); return } setMessage(cause instanceof Error ? cause.message : 'Could not save flow.') } }
-  const remove = async (ids: string[]) => { try { await api.deleteFlows(ids); const removed = new Set(ids); setFlows((current) => current.filter((flow) => !removed.has(flow.id))); setChecked([]); if (selectedId && removed.has(selectedId)) closeCreation(); setMessage('Flow deleted.') } catch (cause) { setDeleteError(cause instanceof Error ? cause.message : 'Could not delete flow.') } }
+  const save = async () => { try { const saved = selectedId ? await api.updateFlow(selectedId, name, selectedEvents) : await api.createFlow(name, selectedEvents); setFlows((current) => sortFlows(selectedId ? current.map((flow) => flow.id === saved.id ? saved : flow) : [...current, saved])); setQuery(''); closeCreation(); setMessage('') } catch (cause) { if (cause instanceof ApiError && cause.code === 'FLOW_NAME_ALREADY_EXISTS') { setDuplicateName(`${cause.message} Please use a different name.`); return } setMessage(cause instanceof Error ? cause.message : 'Could not save flow.') } }
+  const remove = async (ids: string[]) => { try { await api.deleteFlows(ids); const removed = new Set(ids); setFlows((current) => { const remaining = current.filter((flow) => !removed.has(flow.id)); setMessage(remaining.length ? '' : 'No flows yet.'); return remaining }); setChecked([]); if (selectedId && removed.has(selectedId)) closeCreation() } catch (cause) { setDeleteError(cause instanceof Error ? cause.message : 'Could not delete flow.') } }
   const openEventPicker = () => { setDraftEvents(selectedEvents); setEventQuery(''); setEventPickerOpen(true) }
   const toggleDraftEvent = (id: string) => setDraftEvents((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
   const moveEvent = (targetId: string) => {
@@ -63,7 +63,12 @@ export function BuildFlow() {
                 <strong>{flow.name}</strong><span className="event-pill">{flow.events.length} events</span>
               </div>
           } />}
-          {message && <div className="empty-list" role="status">{message}</div>}
+          {!filtered.length && (message && message !== 'No flows yet.' ? <div className="empty-list" role="status">{message}</div> : query.trim() && flows.length ? <section className="feature-empty feature-empty-search" role="status"><span className="feature-empty-icon"><Search /></span><h3>No matching flows</h3><p>We couldn’t find a flow matching “{query.trim()}”.</p><Button onClick={() => setQuery('')}>Clear search</Button></section> : <section className="feature-empty flows-empty" aria-labelledby="flows-empty-title">
+            <div className="feature-empty-visual" aria-hidden="true"><span className="feature-empty-icon"><GitBranch /></span><span className="feature-empty-accent"><Sparkles /></span><i /><i /><i /></div>
+            <span className="feature-empty-eyebrow">Build repeatable journeys</span><h3 id="flows-empty-title">Create your first flow</h3><p>Combine your event definitions into an ordered sequence that can be validated from beginning to end.</p>
+            <div className="feature-empty-steps"><span><b>1</b>Name the flow</span><i /><span><b>2</b>Add events</span><i /><span><b>3</b>Arrange order</span></div>
+            <Button variant="primary" onClick={addFlow}><Plus size={16} />Add Flow</Button>
+          </section>)}
         </Panel>
         {creationOpen && <Panel className="flow-creation">
           <div className="panel-title"><div><h2>Flow Creation</h2><p>Add a name and define the events for this flow.</p></div><IconButton bare label="Close flow creation" onClick={closeCreation}><X size={19} /></IconButton></div>

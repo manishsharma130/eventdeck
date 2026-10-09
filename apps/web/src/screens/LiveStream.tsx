@@ -1,22 +1,48 @@
 import { matchesEventTag, useEventTagsStore } from '../state/event-tags-store'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Circle, MoreVertical, Pause, Play, Search, Square, Trash2, X } from 'lucide-react'
 import { Button, CopyButton, IconButton, Input, Modal, Select, TagBadge } from '../components/ui'
 import { api } from '../services/api'
 import { useLiveStreamStore, type StreamEvent } from '../state/live-stream-store'
 import { useTabState } from '../state/tab-ui-store'
+import { OverflowTicker } from '../components/OverflowTicker'
 
 const tagTones: Record<string, 'green' | 'blue' | 'purple'> = { google_analytics: 'green', branch: 'blue', moengage: 'purple', analytics_event: 'blue' }
 type AnalyticsEvent = StreamEvent
 
+function LiveStreamEmpty({ streamState, onStart }: { streamState: 'running' | 'paused' | 'stopped'; onStart: () => void }) {
+  const running = streamState === 'running'
+  return <section className="live-empty-state" aria-labelledby="live-empty-title">
+    <div className="live-signal-visual" aria-hidden="true">
+      <svg viewBox="0 0 180 180" role="img">
+        <defs><linearGradient id="live-signal-gradient" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#9177ff" /><stop offset="1" stopColor="#318cff" /></linearGradient></defs>
+        <circle className="live-signal-ring ring-one" cx="90" cy="90" r="68" />
+        <circle className="live-signal-ring ring-two" cx="90" cy="90" r="49" />
+        <circle className="live-signal-ring ring-three" cx="90" cy="90" r="31" />
+        <path className="live-signal-wave" d="M44 92h18l8-22 15 47 13-57 13 46 9-14h17" />
+        <circle className="live-signal-core" cx="90" cy="90" r="7" />
+        <circle className="live-signal-particle particle-one" cx="90" cy="22" r="3" />
+        <circle className="live-signal-particle particle-two" cx="139" cy="139" r="3" />
+        <circle className="live-signal-particle particle-three" cx="42" cy="138" r="2.5" />
+      </svg>
+      <span className={`live-signal-status ${running ? 'running' : ''}`}><i />{running ? 'Listening' : streamState === 'paused' ? 'Paused' : 'Ready'}</span>
+    </div>
+    <span className="live-empty-eyebrow">Real-time event monitoring</span>
+    <h2 id="live-empty-title">{running ? 'Listening for live events' : streamState === 'paused' ? 'Your stream is paused' : 'Ready when your app is'}</h2>
+    <p>{running ? 'Events will appear here instantly as your connected app sends them.' : streamState === 'paused' ? 'Resume the stream to continue receiving events from your connected device.' : 'Start the stream and interact with your app to see analytics events arrive in real time.'}</p>
+    {!running && <Button variant="primary" onClick={onStart}><Play size={15} fill="currentColor" />{streamState === 'paused' ? 'Resume Stream' : 'Start Stream'}</Button>}
+  </section>
+}
+
 function EventRow({ event, selected, onSelect }: { event: AnalyticsEvent; selected: boolean; onSelect: () => void }) {
+  const [hovered, setHovered] = useState(false)
   const label = useEventTagsStore(state => state.definitions.find(tag => tag.value === event.tag)?.name)
   const presentation = { label: label ?? event.tag, tone: tagTones[event.tag] ?? 'blue' }
   return (
-    <button className={`event-row ${selected ? 'selected' : ''}`} onClick={onSelect}>
+    <button className={`event-row ${selected ? 'selected' : ''}`} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} onBlur={() => setHovered(false)} onClick={onSelect}>
       <span className="sequence">{String(event.sequence).padStart(3, '0')}</span>
-      <span className="event-main"><strong>{event.name}</strong><small>{event.timestamp}</small></span>
+      <span className="event-main"><OverflowTicker active={hovered} title={event.name}><strong>{event.name}</strong></OverflowTicker><OverflowTicker active={hovered} title={event.timestamp}><small>{event.timestamp}</small></OverflowTicker></span>
       <TagBadge tone={presentation?.tone ?? 'muted'}>{presentation?.label ?? event.tag}</TagBadge>
       <MoreVertical size={18} />
     </button>
@@ -131,7 +157,7 @@ export function LiveStream() {
         </div>
         <div className={`live-grid ${selected ? 'details-open' : 'details-closed'}`}>
           <div className="event-list" ref={scrollRef}>
-            {filtered.length === 0 ? <div className="empty-list">{hasActiveFilter && visibleEvents.length ? 'No matching events.' : 'Waiting for events...'}</div> : (
+            {filtered.length === 0 ? hasActiveFilter && visibleEvents.length ? <section className="feature-empty feature-empty-search live-search-empty" role="status"><span className="feature-empty-icon"><Search /></span><h3>No matching events</h3><p>Try another event name or tag filter.</p><Button onClick={() => { setQuery(''); setTag(null) }}>Clear filters</Button></section> : <LiveStreamEmpty streamState={streamState} onStart={() => void toggleStream()} /> : (
               <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
                 {virtualizer.getVirtualItems().map((item) => {
                   const event = filtered[item.index]
@@ -142,7 +168,7 @@ export function LiveStream() {
           </div>
           {selected && <section className="panel event-details">
             <div className="panel-title"><h2>Event Details</h2><IconButton label="Close details" bare onClick={() => setSelectedEvent(null)}><X size={19} /></IconButton></div>
-            <><dl className="details-list"><dt>Event Name</dt><dd>{selected.name}</dd></dl>
+            <><dl className="details-list"><dt>Event Name</dt><dd><OverflowTicker title={selected.name}>{selected.name}</OverflowTicker></dd></dl>
             <div className="json-head"><h3>Event JSON</h3><CopyButton text={json} /></div>
             <pre className="json-view"><code>{json}</code></pre></>
           </section>}

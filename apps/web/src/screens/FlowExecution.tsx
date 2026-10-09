@@ -1,5 +1,6 @@
 import { useEffect, useMemo, type KeyboardEvent } from 'react'
-import { BarChart3, Check, Circle, CircleX, GitBranch, Info, ListTree, LoaderCircle, Pause, Play, Plus, RotateCcw, Search, Square, Trash2, X } from 'lucide-react'
+import { ArrowRight, BarChart3, Check, Circle, CircleX, GitBranch, Info, ListTree, LoaderCircle, Pause, Play, Plus, RotateCcw, Search, Square, Trash2, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Button, Checkbox, IconButton, Input, Modal, PageHeader, Panel, Select } from '../components/ui'
 import { api, type Completion, type ExecutionState, type Flow, type SelectedFlow } from '../services/api'
 import type { EventDeckWebSocket } from '../services/websocket'
@@ -50,6 +51,7 @@ function ExecutionCard({ flow, active, selectionLocked, onClick, onDelete }: { f
 }
 
 export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | null }) {
+  const navigate = useNavigate()
   const liveStreamState = useLiveStreamStore((state) => state.runtime.streamState)
   const [selectedId, setSelectedId] = useTabState('execution', 'selectedId', '')
   const [visibleFlows, setVisibleFlows] = useTabState<ExecutionFlow[]>('execution', 'visibleFlows', [])
@@ -164,7 +166,13 @@ export function FlowExecution({ websocket }: { websocket: EventDeckWebSocket | n
       </div>
       <div className="execution-top-divider" />
       <div className={`execution-grid execution-bottom-view ${selected ? 'details-open' : 'details-closed'}`}>
-        <Panel className="selected-flows"><div className="selected-flows-header"><div><h2>Selected Flows ({visibleFlows.length})</h2><p>View and monitor the execution status of your event flows.</p></div><Button className="all-results-button" disabled={validationState !== 'stopped' || completedFlows.length === 0} title={validationState !== 'stopped' ? 'Results are available after validation stops' : completedFlows.length === 0 ? 'Run validation to generate results' : 'View combined validation results'} onClick={() => { setGraphicalResults(false); setResultsOpen(true) }}><BarChart3 />All Results</Button></div>{message ? <div className="empty-list" role="status">{message}</div> : visibleFlows.length ? <VirtualList className="execution-flow-list" items={visibleFlows} estimateSize={220} getKey={(flow) => flow.id} renderItem={(flow) => <ExecutionCard flow={flow} active={flow.id === selectedId} selectionLocked={validationState !== 'stopped'} onClick={() => setSelectedId(flow.id)} onDelete={() => void removeFlow(flow.id)} />} /> : <div className="flow-empty-state"><span className="flow-empty-icon"><GitBranch /></span><h3>No flows selected</h3><p>Add a saved flow to begin validation. Create flows in the <strong>Build Flow</strong> tab, then use the Plus control here to add them.</p><Button variant="primary" disabled={validationState !== 'stopped'} onClick={openFlowSelector}><Plus />Select Flows</Button></div>}</Panel>
+        <Panel className="selected-flows"><div className="selected-flows-header"><div><h2>Selected Flows ({visibleFlows.length})</h2><p>View and monitor the execution status of your event flows.</p></div><Button className="all-results-button" disabled={validationState !== 'stopped' || completedFlows.length === 0} title={validationState !== 'stopped' ? 'Results are available after validation stops' : completedFlows.length === 0 ? 'Run validation to generate results' : 'View combined validation results'} onClick={() => { setGraphicalResults(false); setResultsOpen(true) }}><BarChart3 />All Results</Button></div>{message ? <div className="empty-list" role="status">{message}</div> : visibleFlows.length ? <VirtualList className="execution-flow-list" items={visibleFlows} estimateSize={220} getKey={(flow) => flow.id} renderItem={(flow) => <ExecutionCard flow={flow} active={flow.id === selectedId} selectionLocked={validationState !== 'stopped'} onClick={() => setSelectedId(flow.id)} onDelete={() => void removeFlow(flow.id)} />} /> : <section className="execution-empty-state" aria-labelledby="execution-empty-title">
+          <div className="execution-empty-visual" aria-hidden="true"><span className="execution-empty-node start"><GitBranch /></span><i /><span className="execution-empty-node play"><Play fill="currentColor" /></span><i /><span className="execution-empty-node result"><Check /></span></div>
+          <span className="feature-empty-eyebrow">Validation workspace</span><h3 id="execution-empty-title">{availableFlows.length ? 'Select flows to begin validation' : 'Build a flow before you validate'}</h3>
+          <p>{availableFlows.length ? 'Choose one or more saved flows, select an event source, and monitor every validation step in real time.' : 'Flow Execution uses saved Build Flows. Create your first flow, then return here to validate its event sequence.'}</p>
+          <div className="feature-empty-steps"><span><b>1</b>Select flows</span><i /><span><b>2</b>Choose source</span><i /><span><b>3</b>Run validation</span></div>
+          {availableFlows.length ? <Button variant="primary" disabled={validationState !== 'stopped'} onClick={openFlowSelector}><Plus />Select Flows</Button> : <Button variant="primary" onClick={() => navigate('/build-flow')}><GitBranch />Go to Build Flows<ArrowRight /></Button>}
+        </section>}</Panel>
         {selected && <Panel className="execution-details">
           <><div className="execution-title">
             <div className="execution-title-row"><div><h2>Selected Flow Details</h2><p>Real-time execution details and event status for this flow.</p></div><IconButton bare label="Close selected flow details" onClick={() => setSelectedId('')}><X size={19} /></IconButton></div>
