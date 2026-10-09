@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useId, useRef, useState, type ReactNode }
 import { Info, Plug, Tags, Plus, Trash2, HardDrive, X } from 'lucide-react'
 import { api, type ConnectorConfiguration, type ConnectorSettings, type StorageUsage, type StorageModuleId } from '../services/api'
 import { useStorageOperationStore } from '../state/storage-operation-store'
+import { APP_VERSION } from '../config/version'
 
 const connectorHelp: Record<string, string> = {
   analytics_event: 'The core EventDeck connector is always enabled. Events keep the eventTag supplied by your app.',
@@ -290,5 +291,6 @@ export function Settings() {
       <EventTagsOption />
       <StorageOption />
     </div>
+    <footer className="settings-page-version">v{APP_VERSION}</footer>
   </section>
 }

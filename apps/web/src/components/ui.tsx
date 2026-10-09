@@ -2,20 +2,21 @@ import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type Inp
 import { createPortal } from 'react-dom'
 import {
   ChevronDown, CirclePlay, Copy, FileText, GitBranch, Pause,
-  Settings, Play, Radio, Smartphone, Square, UserRound, Video,
+  PanelLeftClose, PanelLeftOpen, Settings, Play, Radio, Smartphone, Square, UserRound, Video,
 } from 'lucide-react'
 import { api, ApiError, type Device } from '../services/api'
 import { useLiveStreamStore } from '../state/live-stream-store'
+import { APP_VERSION } from '../config/version'
 
 export type TabId = 'live' | 'rules' | 'build' | 'execution' | 'recordings' | 'settings'
 
 const navItems: { id: TabId; label: string; icon: typeof Radio }[] = [
   { id: 'live', label: 'Live Stream', icon: Radio },
-  { id: 'recordings', label: 'Recorded Sessions', icon: Video },
   { id: 'rules', label: 'Event Rules', icon: FileText },
-  { id: 'build', label: 'Build Flow', icon: GitBranch },
+  { id: 'build', label: 'Build Flows', icon: GitBranch },
+  { id: 'recordings', label: 'Recorded Sessions', icon: Video },
+  { id: 'execution', label: 'Flow Executions', icon: CirclePlay },
   { id: 'settings', label: 'Settings', icon: Settings },
-  { id: 'execution', label: 'Flow Execution', icon: CirclePlay },
 ]
 
 export function Logo({ compact = false }: { compact?: boolean }) {
@@ -27,18 +28,19 @@ export function Logo({ compact = false }: { compact?: boolean }) {
   )
 }
 
-export function Sidebar({ active, onNavigate }: { active: TabId; onNavigate: (tab: TabId) => void }) {
+export function Sidebar({ active, expanded, onNavigate, onExpandedChange }: { active: TabId; expanded: boolean; onNavigate: (tab: TabId) => void; onExpandedChange: (expanded: boolean) => void }) {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand"><Logo /></div>
+    <aside className={`sidebar ${expanded ? 'expanded' : ''}`}>
+      <div className="sidebar-brand"><Logo /><button className="sidebar-toggle" type="button" aria-label={expanded ? 'Collapse navigation' : 'Expand navigation'} aria-expanded={expanded} onClick={() => onExpandedChange(!expanded)}>{expanded ? <PanelLeftClose /> : <PanelLeftOpen />}</button></div>
       <nav aria-label="Main navigation">
         {navItems.map(({ id, label, icon: Icon }) => (
-          <button key={id} className={`nav-item ${active === id ? 'active' : ''}`} onClick={() => onNavigate(id)}>
+          <button key={id} title={label} className={`nav-item ${active === id ? 'active' : ''}`} onClick={() => onNavigate(id)}>
             <Icon size={22} strokeWidth={1.8} />
-            <span>{label}</span>
+            <span className="nav-label">{label}</span>
           </button>
         ))}
       </nav>
+      <div className="sidebar-version" title={`v${APP_VERSION}`}>v{APP_VERSION}</div>
     </aside>
   )
 }
@@ -121,9 +123,10 @@ export function AppShell({ active, onNavigate, children }: PropsWithChildren<{
   active: TabId
   onNavigate: (tab: TabId) => void
 }>) {
+  const [sidebarExpanded, setSidebarExpanded] = useState(false)
   return (
-    <div className="app-shell">
-      <Sidebar active={active} onNavigate={onNavigate} />
+    <div className={`app-shell ${sidebarExpanded ? 'sidebar-expanded' : 'sidebar-collapsed'}`}>
+      <Sidebar active={active} expanded={sidebarExpanded} onNavigate={onNavigate} onExpandedChange={setSidebarExpanded} />
       <StickyHeader active={active} />
       <main className="workspace">{children}</main>
     </div>

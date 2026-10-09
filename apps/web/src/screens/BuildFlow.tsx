@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { GripVertical, Plus, Search, Trash2, X } from 'lucide-react'
+import { GitBranch, GripVertical, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { Button, Checkbox, IconButton, Input, Modal, PageHeader, Panel } from '../components/ui'
 import { api, ApiError, type EventDefinition, type Flow } from '../services/api'
 import { useTabState } from '../state/tab-ui-store'
@@ -63,7 +63,12 @@ export function BuildFlow() {
                 <strong>{flow.name}</strong><span className="event-pill">{flow.events.length} events</span>
               </div>
           } />}
-          {!filtered.length && <div className="empty-list" role="status">{message || (query.trim() && flows.length ? 'No matching flows.' : 'No flows yet.')}</div>}
+          {!filtered.length && (message && message !== 'No flows yet.' ? <div className="empty-list" role="status">{message}</div> : query.trim() && flows.length ? <section className="feature-empty feature-empty-search" role="status"><span className="feature-empty-icon"><Search /></span><h3>No matching flows</h3><p>We couldn’t find a flow matching “{query.trim()}”.</p><Button onClick={() => setQuery('')}>Clear search</Button></section> : <section className="feature-empty flows-empty" aria-labelledby="flows-empty-title">
+            <div className="feature-empty-visual" aria-hidden="true"><span className="feature-empty-icon"><GitBranch /></span><span className="feature-empty-accent"><Sparkles /></span><i /><i /><i /></div>
+            <span className="feature-empty-eyebrow">Build repeatable journeys</span><h3 id="flows-empty-title">Create your first flow</h3><p>Combine your event definitions into an ordered sequence that can be validated from beginning to end.</p>
+            <div className="feature-empty-steps"><span><b>1</b>Name the flow</span><i /><span><b>2</b>Add events</span><i /><span><b>3</b>Arrange order</span></div>
+            <Button variant="primary" onClick={addFlow}><Plus size={16} />Add Flow</Button>
+          </section>)}
         </Panel>
         {creationOpen && <Panel className="flow-creation">
           <div className="panel-title"><div><h2>Flow Creation</h2><p>Add a name and define the events for this flow.</p></div><IconButton bare label="Close flow creation" onClick={closeCreation}><X size={19} /></IconButton></div>

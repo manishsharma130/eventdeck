@@ -31,6 +31,12 @@ flowchart LR
 
 Only the static web application is deployed. The local Node.js server is never uploaded to GitHub Pages.
 
+The web package's `postbuild` step also copies `dist/index.html` to
+`dist/404.html`. GitHub Pages serves that fallback for direct application URLs
+such as `/eventdeck/build-flow`; React Router then resolves the URL normally and
+keeps the user on the requested tab instead of showing the GitHub Pages 404
+screen.
+
 The initial production URL is expected to be:
 
 ```text

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileText, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react'
+import { FileText, MoreVertical, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { Button, Checkbox, IconButton, Input, Modal, PageHeader, Panel, Select } from '../components/ui'
 import { api, ApiError, type EventDefinition, type MatchType } from '../services/api'
 import { useTabState } from '../state/tab-ui-store'
@@ -142,7 +142,12 @@ export function EventRules() {
             <div className="toolbar rules-toolbar-actions"><Button variant="primary" onClick={addEvent}><Plus size={20} />Add Event</Button><Button disabled={!checked.length} onClick={() => void requestRemove(checked)}><Trash2 size={18} />Delete</Button><span className="toolbar-separator" /><Button disabled={!definitions.length} onClick={() => void requestRemove(definitions.map((item) => item.id))}><Trash2 size={18} />Delete All</Button></div>
           </div>
           {list.length > 0 && <VirtualList className="definition-list" items={list} estimateSize={59} getKey={(definition) => definition.id} renderItem={(definition, index) => <DefinitionRow definition={definition} index={index} selected={selectedId === definition.id} checked={checkedSet.has(definition.id)} onChoose={() => choose(definition)} onCheck={() => setChecked((value) => value.includes(definition.id) ? value.filter((item) => item !== definition.id) : [...value, definition.id])} />} />}
-          {!list.length && <div className="empty-list" role="status">{query.trim() && definitions.length ? 'No matching events.' : message || 'No event rules yet.'}</div>}
+          {!list.length && (message && message !== 'No event rules yet.' ? <div className="empty-list" role="status">{message}</div> : query.trim() && definitions.length ? <section className="feature-empty feature-empty-search" role="status"><span className="feature-empty-icon"><Search /></span><h3>No matching events</h3><p>We couldn’t find an event matching “{query.trim()}”.</p><Button onClick={() => { setSearchDraft(''); setQuery('') }}>Clear search</Button></section> : <section className="feature-empty rules-empty" aria-labelledby="rules-empty-title">
+            <div className="feature-empty-visual" aria-hidden="true"><span className="feature-empty-icon"><FileText /></span><span className="feature-empty-accent"><Sparkles /></span><i /><i /><i /></div>
+            <span className="feature-empty-eyebrow">Reusable event intelligence</span><h3 id="rules-empty-title">Create your first event rule</h3><p>Define an event once, add optional matching conditions, and reuse it across validation flows.</p>
+            <div className="feature-empty-steps"><span><b>1</b>Name the event</span><i /><span><b>2</b>Add conditions</span><i /><span><b>3</b>Use in flows</span></div>
+            <Button variant="primary" onClick={addEvent}><Plus size={16} />Add Event</Button>
+          </section>)}
         </Panel>
         {formOpen && <Panel className="form-panel">
           <div className="panel-title"><div><h2>Event Information</h2><p>Configure the event details and define matching rules.</p></div><IconButton bare label="Close event information" onClick={closeForm}><X size={19} /></IconButton></div>

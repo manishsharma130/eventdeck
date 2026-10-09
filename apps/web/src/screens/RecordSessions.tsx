@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { ArrowLeft, FileText, Search, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, FileText, Radio, Search, Trash2, Video } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Button, CopyButton, EmptyState, IconButton, Input, Modal, PageHeader, TagBadge } from '../components/ui'
 import { api, type RecordedSession } from '../services/api'
 import { useLiveStreamStore } from '../state/live-stream-store'
@@ -9,7 +10,27 @@ import { VirtualGrid } from '../components/VirtualGrid'
 
 type SessionDetails = Awaited<ReturnType<typeof api.recording>>
 
+function RecordedSessionsEmpty({ onStart }: { onStart: () => void }) {
+  return <section className="recordings-empty" aria-labelledby="recordings-empty-title">
+    <div className="recordings-empty-visual" aria-hidden="true">
+      <span className="recordings-empty-orbit"><Radio /></span>
+      <span className="recordings-empty-icon"><Video /></span>
+      <i /><i /><i />
+    </div>
+    <div className="recordings-empty-copy">
+      <span className="recordings-empty-eyebrow">Your session library</span>
+      <h2 id="recordings-empty-title">No recorded sessions yet</h2>
+      <p>Capture a Live Stream session to revisit its events, payloads, and device details whenever you need them.</p>
+      <div className="recordings-empty-steps" aria-label="How to create a recorded session">
+        <span><b>1</b>Select a device</span><i /><span><b>2</b>Record the stream</span><i /><span><b>3</b>Save the session</span>
+      </div>
+      <Button variant="primary" onClick={onStart}><Radio size={16} />Go to Live Stream<ArrowRight size={16} /></Button>
+    </div>
+  </section>
+}
+
 export function RecordSessions() {
+  const navigate = useNavigate()
   const [sessions, setSessions] = useTabState<RecordedSession[]>('recordings', 'sessions', [])
   const [query, setQuery] = useTabState('recordings', 'query', '')
   const [checked, setChecked] = useTabState<string[]>('recordings', 'checked', [])
@@ -85,14 +106,13 @@ export function RecordSessions() {
           <Button disabled={!deletable.length || loading} onClick={() => setPendingDelete(deletable.map((session) => session.id))}>Delete all</Button>
         </div>
       </div>
-      {loading ? <EmptyState title="Loading sessions…" /> : <>
+      {loading ? <EmptyState title="Loading sessions…" /> : visible.length ? <>
         <p className="recording-count">{visible.length} {visible.length === 1 ? 'session' : 'sessions'}{recordingId && ' · Stop and save the active recording before deleting it.'}</p>
         <VirtualGrid className="recording-grid" items={visible} minColumnWidth={270} estimateRowSize={245} getKey={(session) => session.id} renderItem={(session) => <article className={`panel recording-card ${checked.includes(session.id) ? 'selected' : ''}`}>
           <div className="recording-card-actions"><input type="checkbox" aria-label={`Select ${session.name}`} disabled={session.id === recordingId} checked={checked.includes(session.id)} onChange={() => setChecked((current) => current.includes(session.id) ? current.filter((id) => id !== session.id) : [...current, session.id])} /><TagBadge tone={session.status === 'RECORDING' ? 'green' : 'muted'}>{session.status === 'RECORDING' ? 'Recording' : 'Saved'}</TagBadge><IconButton label={`Delete ${session.name}`} disabled={session.id === recordingId} onClick={() => setPendingDelete([session.id])}><Trash2 size={18} /></IconButton></div>
           <button className="recording-card-open" onClick={() => { setError(''); setSelectedId(session.id) }}><FileText size={26} /><h2>{session.name}</h2><span>{session.totalEvents} events · {session.deviceId}</span><small>{new Date(session.startedAt).toLocaleString()}</small><strong>View events →</strong></button>
         </article>} />
-        {!visible.length && !error && <EmptyState title={query.trim() ? 'No matching sessions' : 'No recorded sessions yet'} description={query.trim() ? 'Try another session name or device.' : 'Start a recording in Live Stream, then stop and save it to review the events here.'} />}
-      </>}
+      </> : query.trim() ? <section className="recordings-empty recordings-empty-search"><div className="recordings-empty-icon"><Search /></div><h2>No matching sessions</h2><p>We couldn’t find a session matching “{query.trim()}”. Try another name or device.</p><Button onClick={() => setQuery('')}>Clear search</Button></section> : <RecordedSessionsEmpty onStart={() => navigate('/live-stream')} />}
     </>}
     {pendingDelete && <Modal title="Delete recorded sessions?" onClose={() => { if (!busy) setPendingDelete(null) }} actions={<><Button disabled={busy} onClick={() => setPendingDelete(null)}>Cancel</Button><Button variant="danger" disabled={busy} onClick={() => void remove()}>{busy ? 'Deleting…' : 'Delete'}</Button></>}><p>This will permanently delete {pendingDelete.length} {pendingDelete.length === 1 ? 'session' : 'sessions'} and all their recorded events.</p>{error && <p role="alert">{error}</p>}</Modal>}
   </div>
