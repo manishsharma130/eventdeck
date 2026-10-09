@@ -1,22 +1,24 @@
 import { matchesEventTag, useEventTagsStore } from '../state/event-tags-store'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Circle, MoreVertical, Pause, Play, Search, Square, Trash2, X } from 'lucide-react'
 import { Button, CopyButton, IconButton, Input, Modal, Select, TagBadge } from '../components/ui'
 import { api } from '../services/api'
 import { useLiveStreamStore, type StreamEvent } from '../state/live-stream-store'
 import { useTabState } from '../state/tab-ui-store'
+import { OverflowTicker } from '../components/OverflowTicker'
 
 const tagTones: Record<string, 'green' | 'blue' | 'purple'> = { google_analytics: 'green', branch: 'blue', moengage: 'purple', analytics_event: 'blue' }
 type AnalyticsEvent = StreamEvent
 
 function EventRow({ event, selected, onSelect }: { event: AnalyticsEvent; selected: boolean; onSelect: () => void }) {
+  const [hovered, setHovered] = useState(false)
   const label = useEventTagsStore(state => state.definitions.find(tag => tag.value === event.tag)?.name)
   const presentation = { label: label ?? event.tag, tone: tagTones[event.tag] ?? 'blue' }
   return (
-    <button className={`event-row ${selected ? 'selected' : ''}`} onClick={onSelect}>
+    <button className={`event-row ${selected ? 'selected' : ''}`} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} onBlur={() => setHovered(false)} onClick={onSelect}>
       <span className="sequence">{String(event.sequence).padStart(3, '0')}</span>
-      <span className="event-main"><strong>{event.name}</strong><small>{event.timestamp}</small></span>
+      <span className="event-main"><OverflowTicker active={hovered} title={event.name}><strong>{event.name}</strong></OverflowTicker><OverflowTicker active={hovered} title={event.timestamp}><small>{event.timestamp}</small></OverflowTicker></span>
       <TagBadge tone={presentation?.tone ?? 'muted'}>{presentation?.label ?? event.tag}</TagBadge>
       <MoreVertical size={18} />
     </button>
@@ -142,7 +144,7 @@ export function LiveStream() {
           </div>
           {selected && <section className="panel event-details">
             <div className="panel-title"><h2>Event Details</h2><IconButton label="Close details" bare onClick={() => setSelectedEvent(null)}><X size={19} /></IconButton></div>
-            <><dl className="details-list"><dt>Event Name</dt><dd>{selected.name}</dd></dl>
+            <><dl className="details-list"><dt>Event Name</dt><dd><OverflowTicker title={selected.name}>{selected.name}</OverflowTicker></dd></dl>
             <div className="json-head"><h3>Event JSON</h3><CopyButton text={json} /></div>
             <pre className="json-view"><code>{json}</code></pre></>
           </section>}

@@ -258,6 +258,16 @@
 
 /* The disconnected guide owns the viewport and scrolls without an app header. */
 .disconnected-page { height:100vh; min-height:0; overflow-y:auto; padding:36px 24px; }
+
+/* Long event text stays contained and gently pans only while its row is hovered/focused. */
+.overflow-ticker { display:block; min-width:0; max-width:100%; overflow:hidden; white-space:nowrap; scrollbar-width:none; }
+.overflow-ticker::-webkit-scrollbar { display:none; }
+.overflow-ticker > span { display:inline-block; min-width:max-content; }
+.event-main,.definition-name,.details-list dd { min-width:0; overflow:hidden; }
+.details-list { grid-template-columns:120px minmax(0,1fr); }
+.live-screen .details-list { grid-template-columns:110px minmax(0,1fr); }
+.event-row,.definition-row { overflow:hidden; }
+@media (prefers-reduced-motion:reduce) { .overflow-ticker { text-overflow:ellipsis; } }
 .disconnected-page .disconnect-card { width:min(804px,100%); margin:0 auto; }
 
 /* Compact settings sections with contextual information. */

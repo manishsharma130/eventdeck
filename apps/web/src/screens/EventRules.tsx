@@ -1,12 +1,24 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FileText, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react'
 import { Button, Checkbox, IconButton, Input, Modal, PageHeader, Panel, Select } from '../components/ui'
 import { api, ApiError, type EventDefinition, type MatchType } from '../services/api'
 import { useTabState } from '../state/tab-ui-store'
 import { VirtualList } from '../components/VirtualList'
+import { OverflowTicker } from '../components/OverflowTicker'
 
 type Rule = { parameter: string; condition: MatchType; value: string }
 const emptyRule = (): Rule => ({ parameter: '', condition: 'exact', value: '' })
+
+function DefinitionRow({ definition, index, selected, checked, onChoose, onCheck }: { definition: EventDefinition; index: number; selected: boolean; checked: boolean; onChoose: () => void; onCheck: () => void }) {
+  const [hovered, setHovered] = useState(false)
+  return <div role="button" tabIndex={0} className={`definition-row ${selected ? 'selected' : ''}`} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} onBlur={() => setHovered(false)} onClick={onChoose} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onChoose() }}>
+    <span onClick={(event) => event.stopPropagation()}><Checkbox label={`Select ${definition.name}`} checked={checked} onChange={onCheck} /></span>
+    <span className="sequence">{String(index + 1).padStart(3, '0')}</span>
+    <span className="definition-name"><OverflowTicker active={hovered} title={definition.name}><strong>{definition.name}</strong></OverflowTicker><OverflowTicker active={hovered} title={`Value: ${definition.eventValue}`}><small>Value: {definition.eventValue}</small></OverflowTicker></span>
+    <span className={`rule-count ${definition.rules.length ? 'has-rules' : ''}`}><FileText size={20} />{definition.rules.length ? `${definition.rules.length} ${definition.rules.length === 1 ? 'rule' : 'rules'}` : 'No rules'}</span>
+    <MoreVertical size={18} />
+  </div>
+}
 
 export function EventRules() {
   const [deleteError, setDeleteError] = useTabState('rules', 'deleteError', '')
@@ -129,13 +141,7 @@ export function EventRules() {
             </form>
             <div className="toolbar rules-toolbar-actions"><Button variant="primary" onClick={addEvent}><Plus size={20} />Add Event</Button><Button disabled={!checked.length} onClick={() => void requestRemove(checked)}><Trash2 size={18} />Delete</Button><span className="toolbar-separator" /><Button disabled={!definitions.length} onClick={() => void requestRemove(definitions.map((item) => item.id))}><Trash2 size={18} />Delete All</Button></div>
           </div>
-          {list.length > 0 && <VirtualList className="definition-list" items={list} estimateSize={59} getKey={(definition) => definition.id} renderItem={(definition, index) => <div role="button" tabIndex={0} className={`definition-row ${selectedId === definition.id ? 'selected' : ''}`} onClick={() => choose(definition)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') choose(definition) }}>
-              <span onClick={(event) => event.stopPropagation()}><Checkbox label={`Select ${definition.name}`} checked={checkedSet.has(definition.id)} onChange={() => setChecked((value) => value.includes(definition.id) ? value.filter((item) => item !== definition.id) : [...value, definition.id])} /></span>
-              <span className="sequence">{String(index + 1).padStart(3, '0')}</span>
-              <span className="definition-name"><strong>{definition.name}</strong><small>Value: {definition.eventValue}</small></span>
-              <span className={`rule-count ${definition.rules.length ? 'has-rules' : ''}`}><FileText size={20} />{definition.rules.length ? `${definition.rules.length} ${definition.rules.length === 1 ? 'rule' : 'rules'}` : 'No rules'}</span>
-              <MoreVertical size={18} />
-            </div>} />}
+          {list.length > 0 && <VirtualList className="definition-list" items={list} estimateSize={59} getKey={(definition) => definition.id} renderItem={(definition, index) => <DefinitionRow definition={definition} index={index} selected={selectedId === definition.id} checked={checkedSet.has(definition.id)} onChoose={() => choose(definition)} onCheck={() => setChecked((value) => value.includes(definition.id) ? value.filter((item) => item !== definition.id) : [...value, definition.id])} />} />}
           {!list.length && <div className="empty-list" role="status">{query.trim() && definitions.length ? 'No matching events.' : message || 'No event rules yet.'}</div>}
         </Panel>
         {formOpen && <Panel className="form-panel">

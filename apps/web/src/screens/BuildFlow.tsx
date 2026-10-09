@@ -35,8 +35,8 @@ export function BuildFlow() {
   const clear = () => { setSelectedId(null); setName(''); setSelectedEvents([]); setMessage('') }
   const closeCreation = () => { clear(); setCreationOpen(false) }
   const addFlow = () => { clear(); setCreationOpen(true) }
-  const save = async () => { try { const saved = selectedId ? await api.updateFlow(selectedId, name, selectedEvents) : await api.createFlow(name, selectedEvents); setFlows((current) => sortFlows(selectedId ? current.map((flow) => flow.id === saved.id ? saved : flow) : [...current, saved])); closeCreation(); setMessage('Flow saved.') } catch (cause) { if (cause instanceof ApiError && cause.code === 'FLOW_NAME_ALREADY_EXISTS') { setDuplicateName(`${cause.message} Please use a different name.`); return } setMessage(cause instanceof Error ? cause.message : 'Could not save flow.') } }
-  const remove = async (ids: string[]) => { try { await api.deleteFlows(ids); const removed = new Set(ids); setFlows((current) => current.filter((flow) => !removed.has(flow.id))); setChecked([]); if (selectedId && removed.has(selectedId)) closeCreation(); setMessage('Flow deleted.') } catch (cause) { setDeleteError(cause instanceof Error ? cause.message : 'Could not delete flow.') } }
+  const save = async () => { try { const saved = selectedId ? await api.updateFlow(selectedId, name, selectedEvents) : await api.createFlow(name, selectedEvents); setFlows((current) => sortFlows(selectedId ? current.map((flow) => flow.id === saved.id ? saved : flow) : [...current, saved])); setQuery(''); closeCreation(); setMessage('') } catch (cause) { if (cause instanceof ApiError && cause.code === 'FLOW_NAME_ALREADY_EXISTS') { setDuplicateName(`${cause.message} Please use a different name.`); return } setMessage(cause instanceof Error ? cause.message : 'Could not save flow.') } }
+  const remove = async (ids: string[]) => { try { await api.deleteFlows(ids); const removed = new Set(ids); setFlows((current) => { const remaining = current.filter((flow) => !removed.has(flow.id)); setMessage(remaining.length ? '' : 'No flows yet.'); return remaining }); setChecked([]); if (selectedId && removed.has(selectedId)) closeCreation() } catch (cause) { setDeleteError(cause instanceof Error ? cause.message : 'Could not delete flow.') } }
   const openEventPicker = () => { setDraftEvents(selectedEvents); setEventQuery(''); setEventPickerOpen(true) }
   const toggleDraftEvent = (id: string) => setDraftEvents((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
   const moveEvent = (targetId: string) => {
@@ -63,7 +63,7 @@ export function BuildFlow() {
                 <strong>{flow.name}</strong><span className="event-pill">{flow.events.length} events</span>
               </div>
           } />}
-          {message && <div className="empty-list" role="status">{message}</div>}
+          {!filtered.length && <div className="empty-list" role="status">{message || (query.trim() && flows.length ? 'No matching flows.' : 'No flows yet.')}</div>}
         </Panel>
         {creationOpen && <Panel className="flow-creation">
           <div className="panel-title"><div><h2>Flow Creation</h2><p>Add a name and define the events for this flow.</p></div><IconButton bare label="Close flow creation" onClick={closeCreation}><X size={19} /></IconButton></div>
