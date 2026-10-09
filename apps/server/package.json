@@ -24,6 +24,7 @@
   "bugs": { "url": "https://github.com/manishsharma130/eventdeck/issues" },
   "engines": { "node": ">=20" },
   "dependencies": {
+    "@fastify/cors": "^11.3.1",
     "@fastify/websocket": "^11.2.0",
     "better-sqlite3": "^12.4.1",
     "fastify": "^5.6.1",

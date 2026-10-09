@@ -20,4 +20,30 @@ describe('HTTP server foundation', () => {
     const response = await app.inject({ method: 'GET', url: '/api/status' })
     expect(response.json()).toEqual({ server: 'connected', database: 'connected', version: 'test' })
   })
+
+  it('allows the GitHub Pages application to access the local API', async () => {
+    ;({ app } = await createTestServer())
+    const origin = 'https://manishsharma130.github.io'
+    const response = await app.inject({ method: 'GET', url: '/health', headers: { origin } })
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['access-control-allow-origin']).toBe(origin)
+
+    const preflight = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/status',
+      headers: { origin, 'access-control-request-method': 'GET' },
+    })
+    expect(preflight.statusCode).toBe(204)
+    expect(preflight.headers['access-control-allow-origin']).toBe(origin)
+    expect(preflight.headers['access-control-allow-methods']).toContain('GET')
+  })
+
+  it('does not grant API access to unrelated websites', async () => {
+    ;({ app } = await createTestServer())
+    const response = await app.inject({
+      method: 'GET', url: '/health', headers: { origin: 'https://untrusted.example' },
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['access-control-allow-origin']).toBeUndefined()
+  })
 })

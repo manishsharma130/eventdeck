@@ -41,4 +41,20 @@ describe('WebSocket foundation', () => {
       type: 'server.status_changed', version: 1, timestamp: 1234, payload: { status: 'ready' },
     })
   })
+
+  it('accepts the GitHub Pages origin', async () => {
+    socket = new WebSocket(url(), { origin: 'https://manishsharma130.github.io' })
+    expect(await nextMessage(socket)).toEqual({
+      type: 'connection.ready', version: 1, timestamp: 1234, payload: {},
+    })
+  })
+
+  it('rejects browser connections from unrelated websites', async () => {
+    socket = new WebSocket(url(), { origin: 'https://untrusted.example' })
+    const statusCode = await new Promise<number>((resolve, reject) => {
+      socket?.once('unexpected-response', (_request, response) => resolve(response.statusCode ?? 0))
+      socket?.once('error', reject)
+    })
+    expect(statusCode).toBe(403)
+  })
 })
