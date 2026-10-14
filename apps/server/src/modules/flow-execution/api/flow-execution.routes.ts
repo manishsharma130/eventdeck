@@ -18,7 +18,7 @@ export async function flowExecutionRoutes(app: FastifyInstance, dependencies: Ap
     const input = z.object({ recordedSessionId: z.string().optional() }).parse(request.body ?? {})
     const recording = input.recordedSessionId ? dependencies.liveStreamService.getRecording(input.recordedSessionId) : null
     if (recording?.status === 'RECORDING') throw new AppError('RECORDING_NOT_COMPLETED', 'Stop the recording before using it for flow validation.', 409)
-    const started = dependencies.flowExecutionService.start()
+    const started = dependencies.flowExecutionService.start(recording ? 'RECORDED_SESSION' : 'LIVE_STREAM')
     if (!recording) return started
     for (const recorded of recording.events) {
       dependencies.flowExecutionService.handleEvent(recorded.event)

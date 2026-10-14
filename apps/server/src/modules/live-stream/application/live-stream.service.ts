@@ -8,7 +8,7 @@ import { AppError } from '../../../shared/errors/app-error.js'
 import type { WebSocketGateway } from '../../../websocket/websocket.types.js'
 import type { LiveEvent } from '../../event-rules/domain/event-rule.types.js'
 import type { LiveStreamRuntimeState, RecordedSession } from '../domain/live-stream.types.js'
-import type { AdbClient, AdbDevice, LogcatHandle } from './adb-client.js'
+import { AdbLogcatExitError, type AdbClient, type AdbDevice, type LogcatHandle } from './adb-client.js'
 import type { LiveEventBus } from './live-event-bus.js'
 import type { RecordingRepository } from './recording.repository.js'
 
@@ -64,6 +64,30 @@ export class LiveStreamService {
   }
 
   selectDevice(deviceId: string) { return this.enqueue(() => this.selectDeviceInternal(deviceId)) }
+
+  deviceDisconnected(deviceId: string) { return this.enqueue(() => this.deviceDisconnectedInternal(deviceId)) }
+
+  private async deviceDisconnectedInternal(deviceId: string): Promise<{ disconnected: boolean; state: LiveStreamRuntimeState }> {
+    if (deviceId.trim() !== this.state.selectedDeviceId) return { disconnected: false, state: this.getState() }
+
+    await this.stopLogcat()
+    const recordingSessionId = this.state.recordingSessionId
+    if (this.state.isRecording && recordingSessionId) {
+      // Unexpected disconnects must never turn an incomplete capture into a saved session.
+      this.recordings.deleteMany([recordingSessionId])
+      this.websocket.broadcast('recording.discarded', { sessionId: recordingSessionId, reason: 'DEVICE_DISCONNECTED' })
+    }
+    this.state = {
+      selectedDeviceId: null,
+      streamState: 'STOPPED',
+      isRecording: false,
+      recordingSessionId: null,
+      recordingStartedForDeviceId: null,
+    }
+    this.publishState()
+    this.websocket.broadcast('live_stream.device_disconnected', { deviceId })
+    return { disconnected: true, state: this.getState() }
+  }
 
   private async selectDeviceInternal(deviceId: string): Promise<LiveStreamRuntimeState> {
     const normalized = deviceId.trim()
@@ -189,6 +213,9 @@ export class LiveStreamService {
       await this.registry.setup(this.connectorSettings, { deviceId: this.state.selectedDeviceId, runAdbCommand: args => this.adb.runCommand(args) })
       this.logcat = await this.adb.startAnalyticsLogcat(this.state.selectedDeviceId, (line) => this.handleLogcatLine(line), (error) => {
         void this.enqueue(async () => { if (generation === this.logcatGeneration) await this.stopLogcat() })
+        // ADB commonly closes Logcat with code 0 when a device disappears. Device polling
+        // owns that cleanup path, so this expected exit must not surface as a UI error.
+        if (error instanceof AdbLogcatExitError && error.exitCode === 0) return
         this.logger.error({ err: error, deviceId: this.state.selectedDeviceId }, 'ADB Logcat error')
         this.websocket.broadcast('live_stream.error', { code: 'ADB_LOGCAT_ERROR', message: error.message })
       }, this.registry.getFilters(this.connectorSettings))

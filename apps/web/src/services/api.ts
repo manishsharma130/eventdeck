@@ -74,6 +74,7 @@ export const api = {
   devices: () => request<Device[]>('/api/devices'),
   runtime: () => request<RuntimeState>('/api/live-stream/state'),
   selectDevice: (deviceId: string) => request<RuntimeState>('/api/live-stream/device', body({ deviceId }, 'PUT')),
+  deviceDisconnected: (deviceId: string) => request<RuntimeState>('/api/live-stream/device-disconnected', body({ deviceId })),
   stream: (action: 'play' | 'pause' | 'stop') => request<RuntimeState>(`/api/live-stream/${action}`, body({})),
   startRecording: (name: string) => request<RecordedSession>('/api/live-stream/recording/start', body({ name })),
   stopRecording: (name?: string) => request<RecordedSession>('/api/live-stream/recording/stop', body({ name })),

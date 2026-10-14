@@ -55,4 +55,29 @@ describe('flow execution failures', () => {
     expect(service.getLastCompletion()).toBeNull()
     expect(messages.at(-1)).toMatchObject({ type: 'flow_execution.reset', payload: { status: 'reset' } })
   })
+
+  it('only concludes active validation when its source is Live Stream', () => {
+    const messages: Array<{ type: string; payload: unknown }> = []
+    const websocket: WebSocketGateway = {
+      broadcast: (type, payload) => { messages.push({ type, payload }) },
+      sendToClient: () => undefined,
+      close: () => undefined,
+    }
+    const selection = { getSelected: () => [{
+      flowId: 'flow-1', name: 'Flow', position: 0,
+      events: [{ flowEventId: 'event-1', eventDefinitionId: 'definition-1', eventName: 'open', eventDefinitionName: 'Open', position: 0, rules: [] }],
+    }] } as unknown as FlowSelectionService
+    const service = new FlowExecutionService(selection, websocket, new LiveEventBus())
+
+    service.start('RECORDED_SESSION')
+    expect(service.stopLiveStreamValidation()).toBeNull()
+    expect(service.getState().active).toBe(true)
+    service.stop()
+
+    service.start('LIVE_STREAM')
+    service.handleEvent({ eventName: 'open', eventParams: {} })
+    expect(service.stopLiveStreamValidation()).toMatchObject({ reason: 'SOURCE_COMPLETED', flows: [{ status: 'PASSED' }] })
+    expect(service.getState().active).toBe(false)
+    expect(messages.at(-1)).toMatchObject({ type: 'flow_execution.validation_completed', payload: { reason: 'SOURCE_COMPLETED' } })
+  })
 })

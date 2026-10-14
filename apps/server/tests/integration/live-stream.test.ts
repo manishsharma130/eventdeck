@@ -1,7 +1,7 @@
 import pino from 'pino'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SqliteDatabase } from '../../src/database/sqlite.database.js'
-import type { AdbClient } from '../../src/modules/live-stream/application/adb-client.js'
+import { AdbLogcatExitError, type AdbClient } from '../../src/modules/live-stream/application/adb-client.js'
 import { LiveEventBus } from '../../src/modules/live-stream/application/live-event-bus.js'
 import { LiveStreamService } from '../../src/modules/live-stream/application/live-stream.service.js'
 import { SqliteRecordingRepository } from '../../src/modules/live-stream/infrastructure/sqlite-recording.repository.js'
@@ -32,6 +32,34 @@ describe('device-aware Live Stream recording', () => {
     await service.selectDevice('device-b')
     expect(service.getState().selectedDeviceId).toBe('device-b')
     await service.close()
+  })
+
+  it('resets a disconnected selected device and discards its active recording', async () => {
+    const database = new SqliteDatabase(':memory:')
+    databases.push(database)
+    const stop = vi.fn(async () => undefined)
+    const broadcast = vi.fn()
+    const repository = new SqliteRecordingRepository(database)
+    let reportLogcatError: (error: Error) => void = () => undefined
+    const service = new LiveStreamService(
+      { runCommand: async () => undefined, listDevices: async () => [], startAnalyticsLogcat: async (_device, _message, onError) => { reportLogcatError = onError; return { stop } } },
+      repository, { broadcast, sendToClient: vi.fn(), close: vi.fn() }, new LiveEventBus(), pino({ level: 'silent' }),
+    )
+    await service.selectDevice('device-a')
+    await service.play()
+    const recording = await service.startRecording('Incomplete')
+    service.handleMessage(JSON.stringify({ eventName: 'captured', eventParams: {} }))
+    reportLogcatError(new AdbLogcatExitError(0))
+
+    const result = await service.deviceDisconnected('device-a')
+
+    expect(result.disconnected).toBe(true)
+    expect(service.getState()).toEqual({ selectedDeviceId: null, streamState: 'STOPPED', isRecording: false, recordingSessionId: null, recordingStartedForDeviceId: null })
+    expect(repository.findById(recording.id)).toBeNull()
+    expect(broadcast).toHaveBeenCalledWith('recording.discarded', { sessionId: recording.id, reason: 'DEVICE_DISCONNECTED' })
+    expect(broadcast).toHaveBeenCalledWith('live_stream.device_disconnected', { deviceId: 'device-a' })
+    expect(broadcast).not.toHaveBeenCalledWith('live_stream.error', expect.anything())
+    expect(stop).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
-import type { AdbClient, AdbDevice, LogcatHandle } from '../application/adb-client.js'
+import { AdbLogcatExitError, type AdbClient, type AdbDevice, type LogcatHandle } from '../application/adb-client.js'
 
 function runAdb(arguments_: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -41,7 +41,7 @@ export class RealAdbClient implements AdbClient {
     } catch (error) { lines.close(); throw error }
     process.on('error', onError)
     let stopping = false
-    process.once('close', (code) => { lines.close(); if (!stopping) onError(new Error(`ADB Logcat exited (${code})`)) })
+    process.once('close', (code) => { lines.close(); if (!stopping) onError(new AdbLogcatExitError(code)) })
     return {
       stop: () => new Promise((resolve) => {
         stopping = true
