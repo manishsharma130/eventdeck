@@ -29,12 +29,23 @@ export function Logo({ compact = false }: { compact?: boolean }) {
 }
 
 export function Sidebar({ active, expanded, onNavigate, onExpandedChange }: { active: TabId; expanded: boolean; onNavigate: (tab: TabId) => void; onExpandedChange: (expanded: boolean) => void }) {
+  const [preview, setPreview] = useState(false)
   return (
-    <aside className={`sidebar ${expanded ? 'expanded' : ''}`}>
+    <aside
+      className={`sidebar ${expanded ? 'expanded' : ''} ${preview ? 'preview' : ''}`}
+      onPointerLeave={() => setPreview(false)}
+      onPointerMove={(event) => {
+        if (expanded) return
+        // Only the compact 72px rail shown in the collapsed state may activate
+        // hover preview. The protruding toggle and header controls must not.
+        if (event.clientX <= 72) setPreview(true)
+        else if (event.clientY < 64) setPreview(false)
+      }}
+    >
       <div className="sidebar-brand"><Logo /><button className="sidebar-toggle" type="button" aria-label={expanded ? 'Collapse navigation' : 'Expand navigation'} aria-expanded={expanded} onClick={() => onExpandedChange(!expanded)}>{expanded ? <PanelLeftClose /> : <PanelLeftOpen />}</button></div>
       <nav aria-label="Main navigation">
         {navItems.map(({ id, label, icon: Icon }) => (
-          <button key={id} title={label} className={`nav-item ${active === id ? 'active' : ''}`} onClick={() => onNavigate(id)}>
+          <button key={id} title={label} className={`nav-item ${active === id ? 'active' : ''}`} onClick={() => { setPreview(false); onNavigate(id) }}>
             <Icon size={22} strokeWidth={1.8} />
             <span className="nav-label">{label}</span>
           </button>
