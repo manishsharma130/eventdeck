@@ -8,7 +8,8 @@ import type { FlowSelectionService } from './flow-selection.service.js'
 
 type RuntimeDefinition = { definition: CompiledEventDefinition; passed: boolean; flowReferences: FlowReference[] }
 type RuntimeFlow = Omit<SelectedFlow, 'events'> & { flowIndex: number; events: Array<SelectedFlow['events'][number] & { status: ExecutionEventStatus }> }
-type ExecutionContext = { active: boolean; eventIndex: Map<string, RuntimeDefinition[]>; flows: RuntimeFlow[] }
+type ExecutionSource = 'LIVE_STREAM' | 'RECORDED_SESSION'
+type ExecutionContext = { active: boolean; source: ExecutionSource; eventIndex: Map<string, RuntimeDefinition[]>; flows: RuntimeFlow[] }
 
 export class FlowExecutionService {
   private context: ExecutionContext | null = null
@@ -33,13 +34,13 @@ export class FlowExecutionService {
       flowIndex,
       events: flow.events.map((event) => ({ ...event, status: 'PENDING' })),
     }))
-    this.context = { active: false, eventIndex: new Map(), flows }
+    this.context = { active: false, source: 'LIVE_STREAM', eventIndex: new Map(), flows }
     this.lastCompletion = null
     const result = { status: 'reset' as const, flows }
     this.websocket.broadcast('flow_execution.reset', result)
     return result
   }
-  start(): { status: 'started'; flows: RuntimeFlow[] } {
+  start(source: ExecutionSource = 'LIVE_STREAM'): { status: 'started'; flows: RuntimeFlow[] } {
     if (this.context?.active) throw new AppError('VALIDATION_ALREADY_ACTIVE', 'Flow validation is already active.', 409)
     this.lastCompletion = null
     const selected = this.selection.getSelected()
@@ -57,10 +58,14 @@ export class FlowExecutionService {
     }
     const eventIndex = new Map<string, RuntimeDefinition[]>()
     for (const runtime of definitions.values()) eventIndex.set(runtime.definition.eventValue, [...(eventIndex.get(runtime.definition.eventValue) ?? []), runtime])
-    this.context = { active: true, eventIndex, flows }
+    this.context = { active: true, source, eventIndex, flows }
     const result = { status: 'started' as const, flows }
     this.websocket.broadcast('flow_execution.started', result)
     return result
+  }
+  stopLiveStreamValidation(): ValidationCompleted | null {
+    if (!this.context?.active || this.context.source !== 'LIVE_STREAM') return null
+    return this.stop('SOURCE_COMPLETED')
   }
   handleEvent(event: LiveEvent): DefinitionPassedUpdate[] {
     if (!this.context?.active) return []

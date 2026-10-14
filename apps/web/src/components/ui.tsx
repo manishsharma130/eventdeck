@@ -67,7 +67,6 @@ export function StickyHeader({ active }: {
   const runtimeRef = useRef(runtime)
   useEffect(() => { runtimeRef.current = runtime }, [runtime])
   useEffect(() => {
-    if (active !== 'live') return
     let stopped = false
     const detectDevices = async () => {
       try {
@@ -80,7 +79,13 @@ export function StickyHeader({ active }: {
           const disconnected = deviceSnapshot.current.find((device) => previous.has(device.id) && !nextIds.has(device.id))
           if (disconnected) {
             setToast(`${disconnected.name ?? disconnected.model ?? disconnected.id} disconnected.`)
-            if (runtimeRef.current.selectedDeviceId === disconnected.id && runtimeRef.current.streamState !== 'STOPPED') void stream('stop')
+            if (runtimeRef.current.selectedDeviceId === disconnected.id) {
+              setConfirmDevice(null)
+              setBlockedDevice(null)
+              setSessionName('')
+              try { setRuntime(await api.deviceDisconnected(disconnected.id)); setError('') }
+              catch (cause) { if (!stopped) setError(cause instanceof Error ? cause.message : 'Could not clean up the disconnected device.') }
+            }
           } else if (connected) setToast(`${connected.name ?? connected.model ?? connected.id} connected.`)
         }
         knownDevices.current = nextIds
@@ -91,7 +96,7 @@ export function StickyHeader({ active }: {
     void detectDevices()
     const timer = window.setInterval(() => void detectDevices(), 2000)
     return () => { stopped = true; window.clearInterval(timer); knownDevices.current = null; deviceSnapshot.current = [] }
-  }, [active])
+  }, [])
   const changeDevice = async (deviceId: string) => { try { setRuntime(await api.selectDevice(deviceId)); setError('') } catch (cause) { if (cause instanceof ApiError && cause.code === 'RECORDING_ACTIVE_DEVICE_CHANGE_BLOCKED') setBlockedDevice(deviceId); else setError(cause instanceof Error ? cause.message : 'Could not change device.') } }
   const requestDeviceChange = (deviceId: string) => {
     if (!deviceId || !runtime?.selectedDeviceId || deviceId === runtime.selectedDeviceId) { if (deviceId) void changeDevice(deviceId); return }

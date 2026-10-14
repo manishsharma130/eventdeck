@@ -95,6 +95,11 @@ export const useLiveStreamStore = create<LiveStreamStore>((set, get) => ({
       set((state) => ({ runtime: { ...state.runtime, selectedDeviceId: deviceId }, events: [], nextSequence: 1, selectedEventId: null, tag: null, notice: 'Device changed. Live Stream was cleared.' }))
       return
     }
+    if (message.type === 'live_stream.device_disconnected') {
+      // Preserve captured events: only the selected device and active runtime are reset.
+      set((state) => ({ runtime: { ...state.runtime, selectedDeviceId: null, streamState: 'STOPPED', isRecording: false, recordingSessionId: null, recordingStartedForDeviceId: null }, error: '' }))
+      return
+    }
     if (message.type === 'live_stream.event') {
       const event = message.payload as LiveEvent
       set((state) => {
@@ -114,6 +119,7 @@ export const useLiveStreamStore = create<LiveStreamStore>((set, get) => ({
     if (message.type === 'live_stream.parse_error' || message.type === 'live_stream.error' || message.type === 'recording.error') {
       set({ error: (message.payload as { message?: string }).message ?? 'A Live Stream error occurred.' })
     } else if (message.type === 'recording.started') set({ notice: 'Recording started.' })
+    else if (message.type === 'recording.discarded') set({ notice: 'Device disconnected. Active recording was discarded.' })
     else if (message.type === 'recording.stopped') set({ notice: 'Recording saved.' })
   },
 }))

@@ -13,6 +13,12 @@ export async function liveStreamRoutes(app: FastifyInstance, dependencies: AppDe
   app.get('/api/devices', async () => service.listDevices())
   app.get('/api/live-stream/state', async () => service.getState())
   app.put('/api/live-stream/device', async (request) => service.selectDevice(z.object({ deviceId: z.string() }).parse(request.body).deviceId))
+  app.post('/api/live-stream/device-disconnected', async (request) => {
+    const { deviceId } = z.object({ deviceId: z.string().min(1) }).parse(request.body)
+    const result = await service.deviceDisconnected(deviceId)
+    if (result.disconnected) dependencies.flowExecutionService.stopLiveStreamValidation()
+    return result.state
+  })
   app.post('/api/live-stream/play', async () => service.play())
   app.post('/api/live-stream/pause', async () => service.pause())
   app.post('/api/live-stream/stop', async () => service.stop())
